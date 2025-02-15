@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="my-4">Book an Appointment</h2>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="service" class="form-label">Select Service</label>
+            {{ form.service }}
+        </div>
+
+        <div class="mb-3">
+            <label for="date" class="form-label">Select Date</label>
+            {{ form.date }}
+        </div>
+
+        <div class="mb-3">
+            <label for="time" class="form-label">Select Time</label>
+            {{ form.time }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Book Now</button>
+    </form>
+</div>
+{% endblock %}

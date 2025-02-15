@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mt-5">
+                <div class="card-body text-center">
+                    <h2 class="mb-4">Invalid Reset Link</h2>
+                    <p>The password reset link is invalid or has expired.</p>
+                    <p>Please request a new password reset link.</p>
+                    <a href="{% url 'forgot_password' %}" class="btn btn-primary mt-3">Request New Reset Link</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

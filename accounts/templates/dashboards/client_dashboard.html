@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Client Dashboard</h1>
+    <div class="row">
+        <!-- Profile Section -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Profile</h5>
+                    <p>Welcome, {{ user.username }}</p>
+                    <p>Email: {{ user.email }}</p>
+                    <a href="{% url 'update_profile' %}" class="btn btn-info">Edit Profile</a>
+                    <a href="{% url 'change_password' %}" class="btn btn-warning">Change Password</a>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Appointments -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h3>Upcoming Appointments</h3>
+                    {% if upcoming_appointments %}
+                        <ul>
+                            {% for appointment in upcoming_appointments %}
+                                <li>
+                                    {{ appointment.service.name }} on {{ appointment.date }} at {{ appointment.time }} ({{ appointment.status }})
+
+                                    {% if appointment.status == "Confirmed" %}
+                                        <a href="{% url 'complete_appointment' appointment.id %}" class="btn btn-success btn-sm">Complete</a>
+                                    {% endif %}
+
+                                    {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
+                                        <a href="{% url 'cancel_appointment' appointment.id %}" class="btn btn-danger btn-sm">Cancel</a>
+                                        <a href="{% url 'reschedule_appointment' appointment.id %}" class="btn btn-warning btn-sm">Reschedule</a>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>No upcoming appointments.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Book Appointment -->
+        <div class="col-md-4 mt-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Book a New Appointment</h5>
+                    <a href="{% url 'book_appointment' %}" class="btn btn-primary">Book Now</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointment History -->
+        <div class="col-md-8 mt-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Appointment History</h5>
+                    {% if past_appointments %}
+                        <ul>
+                            {% for appointment in past_appointments %}
+                                <li>{{ appointment.service.name }} - {{ appointment.date }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>No past appointments.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Salon Services -->
+        <div class="col-md-6 mt-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Salon Services</h5>
+                    <ul>
+                        {% for service in services %}
+                            <li>{{ service.name }} - ${{ service.price }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loyalty Points -->
+        <div class="col-md-6 mt-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Loyalty Points</h5>
+                    <p>You have <strong>{{ loyalty_points.points }}</strong> points.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Support -->
+        <div class="col-md-6 mt-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Need Help?</h5>
+                    <p>Call us at: +1 234 567 890</p>
+                    <p>Email: support@hairsalon.com</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
