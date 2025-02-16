@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body p-4">
+                    <!-- Invoice Header -->
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <h2 class="mb-0">INVOICE</h2>
+                            <small class="text-muted">Invoice #{{ payment.receipt_number }}</small>
+                        </div>
+                        <div class="col-6 text-end">
+                            <img src="{% static 'img/logo.png' %}" alt="Salon Logo" height="50">
+                            <p class="mb-0">Beauty Salon</p>
+                            <small class="text-muted">123 Main Street, City</small>
+                        </div>
+                    </div>
+
+                    <!-- Client & Invoice Details -->
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <h6 class="mb-3">Billed To:</h6>
+                            <p class="mb-0">{{ appointment.client.get_full_name }}</p>
+                            <p class="mb-0">{{ appointment.client.email }}</p>
+                            <p class="mb-0">{{ appointment.client.phone_number }}</p>
+                        </div>
+                        <div class="col-sm-6 text-sm-end">
+                            <h6 class="mb-3">Invoice Details:</h6>
+                            <p class="mb-0">Invoice Date: {{ payment.payment_date|date:"F d, Y" }}</p>
+                            <p class="mb-0">Appointment Date: {{ appointment.date|date:"F d, Y" }}</p>
+                            <p class="mb-0">Time: {{ appointment.time }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Services Table -->
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Duration</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for service in appointment.appointment_services.all %}
+                                <tr>
+                                    <td>{{ service.service.name }}</td>
+                                    <td>{{ service.service.duration }} mins</td>
+                                    <td class="text-end">${{ service.price|floatformat:2 }}</td>
+                                    <td class="text-center">{{ service.quantity }}</td>
+                                    <td class="text-end">${{ service.total|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="4" class="text-end">Subtotal:</td>
+                                    <td class="text-end">${{ total|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-end">Tax (13%):</td>
+                                    <td class="text-end">${{ tax|floatformat:2 }}</td>
+                                </tr>
+                                <tr class="fw-bold">
+                                    <td colspan="4" class="text-end">Total Amount:</td>
+                                    <td class="text-end">${{ grand_total|floatformat:2 }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Payment Information -->
+                    <div class="row mt-4">
+                        <div class="col-sm-6">
+                            <h6>Payment Information:</h6>
+                            <p class="mb-0">Status: <span class="badge bg-success">{{ payment.get_status_display }}</span></p>
+                            <p class="mb-0">Method: {{ payment.get_payment_method_display }}</p>
+                            <p class="mb-0">Transaction ID: {{ payment.transaction_id }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <h6>Loyalty Points Earned:</h6>
+                            <p class="mb-0">+5 points for this visit</p>
+                            <p class="mb-0">Current Balance: {{ loyalty_points.points }} points</p>
+                        </div>
+                    </div>
+
+                    <!-- Terms and Notes -->
+                    <div class="mt-4 pt-4 border-top">
+                        <h6>Terms & Conditions:</h6>
+                        <small class="text-muted">
+                            <ul class="mb-0">
+                                <li>Payment is non-refundable</li>
+                                <li>Rescheduling must be done 24 hours in advance</li>
+                                <li>Loyalty points will be added to your account within 24 hours</li>
+                            </ul>
+                        </small>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="text-center mt-4">
+                        <button onclick="window.print()" class="btn btn-primary">
+                            <i class="fas fa-print me-2"></i>Print Invoice
+                        </button>
+                        <button onclick="downloadPDF()" class="btn btn-secondary">
+                            <i class="fas fa-download me-2"></i>Download PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .navbar, footer {
+        display: none !important;
+    }
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
+.table th, .table td {
+    padding: 12px;
+}
+.badge {
+    padding: 8px 12px;
+}
+</style>
+
+<script>
+function downloadPDF() {
+    // Use html2pdf.js to generate PDF
+    const element = document.querySelector('.card-body');
+    const opt = {
+        margin: 1,
+        filename: 'invoice-{{ payment.receipt_number }}.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
+{% endblock %} 

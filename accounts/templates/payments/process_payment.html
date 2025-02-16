@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Payment Summary Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Payment Summary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Appointment Details</h5>
+                            <p class="mb-1">Date: {{ appointment.date|date:"F d, Y" }}</p>
+                            <p class="mb-1">Time: {{ appointment.time }}</p>
+                            <p class="mb-1">Status: <span class="badge bg-success">{{ appointment.status }}</span></p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h5>Amount Due</h5>
+                            <h3 class="text-primary">${{ grand_total|floatformat:2 }}</h3>
+                            <small class="text-muted">Including {{ tax|floatformat:2 }} tax</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Method Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Select Payment Method</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="payment-form" onsubmit="return handlePaymentSubmission(event)">
+                        {% csrf_token %}
+                        
+                        <!-- Payment Methods -->
+                        <div class="row mb-4">
+                            {% for value, name in form.payment_method.field.choices %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card payment-method-card {% if forloop.first %}selected{% endif %}">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="payment_method" 
+                                                   value="{{ value }}" id="payment_{{ value }}"
+                                                   {% if forloop.first %}checked{% endif %}>
+                                            <label class="form-check-label" for="payment_{{ value }}">
+                                                <i class="fab fa-{{ value|lower }} fa-2x me-2"></i>
+                                                {{ name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Simulated Card Input Fields -->
+                        <div id="card-details">
+                            <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Card Number</label>
+                                    <input type="text" class="form-control" placeholder="1234 5678 9012 3456" 
+                                           pattern="[0-9\s]{13,19}" maxlength="19">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Expiry Date</label>
+                                    <input type="text" class="form-control" placeholder="MM/YY" 
+                                           pattern="(0[1-9]|1[0-2])\/([0-9]{2})" maxlength="5">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">CVV</label>
+                                    <input type="text" class="form-control" placeholder="123" 
+                                           pattern="[0-9]{3,4}" maxlength="4">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add this right before the form's closing tag -->
+                        <div id="payment-processing" class="d-none">
+                            <div class="text-center p-4">
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="progress mb-3">
+                                    <div id="payment-progress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <h5 id="status-text">Initializing payment...</h5>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-button">
+                                Pay ${{ grand_total|floatformat:2 }}
+                            </button>
+                            <a href="{% url 'client_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.payment-method-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.payment-method-card:hover, .payment-method-card.selected {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+.payment-method-card .form-check-label {
+    width: 100%;
+    cursor: pointer;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.payment-method-card');
+    
+    cards.forEach(card => {
+        card.addEventListener('click', function() {
+            // Remove selected class from all cards
+            cards.forEach(c => c.classList.remove('selected'));
+            // Add selected class to clicked card
+            this.classList.add('selected');
+            // Check the radio input
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+
+    // Simple card number formatting
+    const cardInput = document.querySelector('input[placeholder="1234 5678 9012 3456"]');
+    cardInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\s/g, '');
+        let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+        e.target.value = formatted;
+    });
+
+    // Expiry date formatting
+    const expiryInput = document.querySelector('input[placeholder="MM/YY"]');
+    expiryInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length >= 2) {
+            value = value.slice(0,2) + '/' + value.slice(2);
+        }
+        e.target.value = value;
+    });
+});
+
+function handlePaymentSubmission(event) {
+    event.preventDefault();
+    
+    // Basic form validation
+    const cardNumber = document.querySelector('input[placeholder="1234 5678 9012 3456"]').value.replace(/\s/g, '');
+    const expiryDate = document.querySelector('input[placeholder="MM/YY"]').value;
+    const cvv = document.querySelector('input[placeholder="123"]').value;
+    
+    if (!cardNumber || !expiryDate || !cvv) {
+        alert('Please fill in all card details');
+        return false;
+    }
+    
+    if (cardNumber.length < 16) {
+        alert('Please enter a valid card number');
+        return false;
+    }
+    
+    if (!/^(0[1-9]|1[0-2])\/([0-9]{2})$/.test(expiryDate)) {
+        alert('Please enter a valid expiry date (MM/YY)');
+        return false;
+    }
+    
+    if (cvv.length < 3) {
+        alert('Please enter a valid CVV');
+        return false;
+    }
+    
+    // Hide form and show processing
+    document.getElementById('payment-form').querySelector('.card-body').classList.add('d-none');
+    document.getElementById('payment-processing').classList.remove('d-none');
+    
+    // Start progress animation
+    simulatePaymentProcessing();
+    return false;
+}
+
+function simulatePaymentProcessing() {
+    const progressBar = document.getElementById('payment-progress');
+    const statusText = document.getElementById('status-text');
+    let progress = 0;
+    
+    const interval = setInterval(() => {
+        progress += 10;
+        progressBar.style.width = progress + '%';
+        
+        switch(progress) {
+            case 20:
+                statusText.textContent = 'Validating payment details...';
+                break;
+            case 50:
+                statusText.textContent = 'Processing payment...';
+                break;
+            case 80:
+                statusText.textContent = 'Finalizing transaction...';
+                break;
+            case 100:
+                statusText.textContent = 'Payment successful!';
+                clearInterval(interval);
+                setTimeout(() => {
+                    document.getElementById('payment-form').submit();
+                }, 1000);
+                break;
+        }
+    }, 500);
+}
+</script>
+{% endblock %} 

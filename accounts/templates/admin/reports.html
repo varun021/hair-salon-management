@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h3 class="mb-4">Reports & Analytics</h3>
+
+    <!-- Revenue Overview -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Revenue Overview</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Appointment Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="appointmentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Reports -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Detailed Reports</h5>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-primary">
+                                <i class="fas fa-download me-2"></i>Export
+                            </button>
+                            <button class="btn btn-outline-secondary">
+                                <i class="fas fa-print me-2"></i>Print
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-4">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#revenue">Revenue</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#appointments">Appointments</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#services">Services</a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="revenue">
+                            <!-- Revenue Table -->
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Revenue</th>
+                                            <th>Appointments</th>
+                                            <th>Average Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Add your revenue data here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="appointments">
+                            <!-- Appointments Table -->
+                        </div>
+                        <div class="tab-pane fade" id="services">
+                            <!-- Services Table -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Sample charts - replace with real data
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [{
+            label: 'Monthly Revenue',
+            data: [1200, 1900, 1500, 2100, 1800, 2300],
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }]
+    }
+});
+
+const appointmentCtx = document.getElementById('appointmentChart').getContext('2d');
+new Chart(appointmentCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Completed', 'Pending', 'Cancelled'],
+        datasets: [{
+            data: [65, 25, 10],
+            backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+        }]
+    }
+});
+</script>
+{% endblock %} 

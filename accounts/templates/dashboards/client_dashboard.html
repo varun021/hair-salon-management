@@ -1,114 +1,322 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container">
-    <h1>Client Dashboard</h1>
-    <div class="row">
-        <!-- Profile Section -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Profile</h5>
-                    <p>Welcome, {{ user.username }}</p>
-                    <p>Email: {{ user.email }}</p>
-                    <a href="{% url 'update_profile' %}" class="btn btn-info">Edit Profile</a>
-                    <a href="{% url 'change_password' %}" class="btn btn-warning">Change Password</a>
-
+<div class="container-fluid py-4">
+    <!-- Welcome Section -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card bg-primary text-white">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-1">Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
+                        <p class="mb-0">Manage your appointments and services</p>
+                    </div>
+                    <div class="text-end">
+                        <h4 class="mb-1">Loyalty Points</h4>
+                        <h3 class="mb-0">{{ loyalty_points.points }} <i class="fas fa-star text-warning"></i></h3>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <!-- Upcoming Appointments -->
-        <div class="col-md-8">
+        <div class="col-lg-4">
             <div class="card">
                 <div class="card-body">
-                    <h3>Upcoming Appointments</h3>
-                    {% if upcoming_appointments %}
-                        <ul>
-                            {% for appointment in upcoming_appointments %}
-                                <li>
-                                    {{ appointment.service.name }} on {{ appointment.date }} at {{ appointment.time }} ({{ appointment.status }})
+                    <h5 class="card-title">Quick Actions</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'book_appointment' %}" class="btn btn-primary">
+                            <i class="fas fa-calendar-plus me-2"></i>Book New Appointment
+                        </a>
+                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user-edit me-2"></i>Update Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                                    {% if appointment.status == "Confirmed" %}
-                                        <a href="{% url 'complete_appointment' appointment.id %}" class="btn btn-success btn-sm">Complete</a>
+    <!-- Notifications -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell me-2"></i>Notifications
+                        {% if unread_notifications %}
+                            <span class="badge bg-danger">{{ unread_notifications.count }}</span>
+                        {% endif %}
+                    </h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="markAllAsRead()">
+                        Mark all as read
+                    </button>
+                </div>
+                <div class="card-body notification-list" style="max-height: 300px; overflow-y: auto;">
+                    {% if notifications %}
+                        {% for notification in notifications %}
+                            <div class="notification-item p-3 {% if not notification.is_read %}unread{% endif %}"
+                                 data-notification-id="{{ notification.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ notification.title }}</h6>
+                                        <p class="mb-1">{{ notification.message }}</p>
+                                        <small class="text-muted">
+                                            {{ notification.created_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                    {% if not notification.is_read %}
+                                        <button class="btn btn-sm btn-link mark-read-btn">
+                                            Mark as read
+                                        </button>
                                     {% endif %}
-
-                                    {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
-                                        <a href="{% url 'cancel_appointment' appointment.id %}" class="btn btn-danger btn-sm">Cancel</a>
-                                        <a href="{% url 'reschedule_appointment' appointment.id %}" class="btn btn-warning btn-sm">Reschedule</a>
-                                    {% endif %}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p>No upcoming appointments.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Book Appointment -->
-        <div class="col-md-4 mt-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Book a New Appointment</h5>
-                    <a href="{% url 'book_appointment' %}" class="btn btn-primary">Book Now</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Appointment History -->
-        <div class="col-md-8 mt-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Appointment History</h5>
-                    {% if past_appointments %}
-                        <ul>
-                            {% for appointment in past_appointments %}
-                                <li>{{ appointment.service.name }} - {{ appointment.date }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p>No past appointments.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Salon Services -->
-        <div class="col-md-6 mt-3">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Salon Services</h5>
-                    <ul>
-                        {% for service in services %}
-                            <li>{{ service.name }} - ${{ service.price }}</li>
+                                </div>
+                            </div>
                         {% endfor %}
-                    </ul>
+                    {% else %}
+                        <p class="text-muted text-center mb-0">No notifications</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Loyalty Points -->
-        <div class="col-md-6 mt-3">
+    <!-- Upcoming Appointments -->
+    <div class="row mb-4">
+        <div class="col-12">
             <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Upcoming Appointments</h5>
+                </div>
                 <div class="card-body">
-                    <h5 class="card-title">Loyalty Points</h5>
-                    <p>You have <strong>{{ loyalty_points.points }}</strong> points.</p>
+                    {% if upcoming_appointments %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Service(s)</th>
+                                        <th>Date & Time</th>
+                                        <th>Status</th>
+                                        <th>Total</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for appointment in upcoming_appointments %}
+                                    <tr>
+                                        <td>
+                                            {% for service in appointment.appointment_services.all %}
+                                                <div>{{ service.service.name }}</div>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <div>{{ appointment.date|date:"F d, Y" }}</div>
+                                            <small class="text-muted">{{ appointment.time|time:"g:i A" }}</small>
+                                        </td>
+                                        <td>
+                                            {% if appointment.status == 'Confirmed' %}
+                                                <span class="badge bg-success">{{ appointment.status }}</span>
+                                            {% elif appointment.status == 'Pending' %}
+                                                <span class="badge bg-warning">{{ appointment.status }}</span>
+                                            {% elif appointment.status == 'Completed' %}
+                                                <span class="badge bg-info">{{ appointment.status }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ appointment.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
+                                        <td>
+                                            {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
+                                                <div class="btn-group">
+                                                    <a href="{% url 'reschedule_appointment' appointment.id %}" 
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-clock me-1"></i>Reschedule
+                                                    </a>
+                                                    <a href="{% url 'cancel_appointment' appointment.id %}" 
+                                                       class="btn btn-sm btn-outline-danger"
+                                                       onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                                                        <i class="fas fa-times me-1"></i>Cancel
+                                                    </a>
+                                                </div>
+                                            {% endif %}
+                                            {% if appointment.status == "Completed" and not appointment.payment %}
+                                                <a href="{% url 'process_payment' appointment.id %}" 
+                                                   class="btn btn-sm btn-success">
+                                                    <i class="fas fa-credit-card me-1"></i>Pay Now
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">No upcoming appointments</p>
+                            <a href="{% url 'book_appointment' %}" class="btn btn-primary mt-3">
+                                Book an Appointment
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Contact Support -->
-        <div class="col-md-6 mt-3">
+    <!-- Past Appointments -->
+    <div class="row">
+        <div class="col-12">
             <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Need Help?</h5>
-                    <p>Call us at: +1 234 567 890</p>
-                    <p>Email: support@hairsalon.com</p>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Appointment History
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#pastAppointments">
+                        Toggle History
+                    </button>
+                </div>
+                <div class="collapse show" id="pastAppointments">
+                    <div class="card-body">
+                        {% if past_appointments %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Service(s)</th>
+                                            <th>Date & Time</th>
+                                            <th>Status</th>
+                                            <th>Total</th>
+                                            <th>Payment Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for appointment in past_appointments %}
+                                        <tr>
+                                            <td>
+                                                {% for service in appointment.appointment_services.all %}
+                                                    <div>{{ service.service.name }}</div>
+                                                    <small class="text-muted">
+                                                        Quantity: {{ service.quantity }}
+                                                    </small>
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                <div>{{ appointment.date|date:"F d, Y" }}</div>
+                                                <small class="text-muted">
+                                                    {{ appointment.time|time:"g:i A" }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if appointment.status == 'Completed' %}
+                                                    <span class="badge bg-info">Completed</span>
+                                                {% elif appointment.status == 'Paid' %}
+                                                    <span class="badge bg-success">Paid</span>
+                                                {% elif appointment.status == 'Cancelled' %}
+                                                    <span class="badge bg-danger">Cancelled</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ appointment.status }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
+                                            <td>
+                                                {% if appointment.payment %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check-circle me-1"></i>Paid
+                                                    </span>
+                                                {% elif appointment.status == 'Completed' %}
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-clock me-1"></i>Pending
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">N/A</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if appointment.status == 'Completed' and not appointment.payment %}
+                                                    <a href="{% url 'process_payment' appointment.id %}" 
+                                                       class="btn btn-primary btn-sm">
+                                                        <i class="fas fa-credit-card me-1"></i>Pay Now
+                                                    </a>
+                                                {% elif appointment.payment %}
+                                                    <a href="{% url 'payment_confirmation' appointment.payment.id %}" 
+                                                       class="btn btn-outline-secondary btn-sm">
+                                                        <i class="fas fa-receipt me-1"></i>View Receipt
+                                                    </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                                <p class="text-muted mb-0">No appointment history available</p>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.notification-item {
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.3s;
+}
+.notification-item:last-child {
+    border-bottom: none;
+}
+.notification-item.unread {
+    background-color: #f8f9fa;
+}
+.notification-item:hover {
+    background-color: #f1f3f5;
+}
+.badge {
+    padding: 0.5em 0.8em;
+}
+</style>
+
+<script>
+function markAllAsRead() {
+    fetch('{% url "mark_all_notifications_read" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+document.querySelectorAll('.mark-read-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const notificationId = this.closest('.notification-item').dataset.notificationId;
+        fetch(`/notifications/${notificationId}/mark-read/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.closest('.notification-item').classList.remove('unread');
+                this.remove();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -28,6 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 AUTH_USER_MODEL = 'accounts.User'
 
+LOGIN_URL = 'signin'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'landing_page'
 
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'accounts',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Service Management</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'add_service' %}" class="btn btn-primary">Add New Service</a>
+        </div>
+    </div>
+
+    <!-- Service Categories -->
+    <div class="row mb-4">
+        {% for category in categories %}
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ category.name }}</h5>
+                    <button class="btn btn-sm btn-outline-primary edit-category" 
+                            data-category-id="{{ category.id }}">
+                        Edit Category
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Service Name</th>
+                                    <th>Duration</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for service in category.service_set.all %}
+                                <tr>
+                                    <td>{{ service.name }}</td>
+                                    <td>{{ service.duration }} mins</td>
+                                    <td>${{ service.price }}</td>
+                                    <td>
+                                        <span class="badge {% if service.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                            {{ service.is_active|yesno:"Active,Inactive" }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning edit-service" 
+                                                data-service-id="{{ service.id }}">
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-danger delete-service" 
+                                                data-service-id="{{ service.id }}">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No services in this category</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Edit Service Modal -->
+<div class="modal fade" id="editServiceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editServiceForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Service Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duration (minutes)</label>
+                        <input type="number" class="form-control" name="duration" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Price ($)</label>
+                        <input type="number" class="form-control" name="price" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" name="category" required>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="serviceActive">
+                        <label class="form-check-label" for="serviceActive">Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveServiceBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Edit Service
+    const editButtons = document.querySelectorAll('.edit-service');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const serviceId = this.dataset.serviceId;
+            fetch(`/services/${serviceId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const form = document.getElementById('editServiceForm');
+                    form.querySelector('[name="name"]').value = data.name;
+                    form.querySelector('[name="duration"]').value = data.duration;
+                    form.querySelector('[name="price"]').value = data.price;
+                    form.querySelector('[name="category"]').value = data.category;
+                    form.querySelector('[name="is_active"]').checked = data.is_active;
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('editServiceModal'));
+                    modal.show();
+                    
+                    // Save button handler
+                    document.getElementById('saveServiceBtn').onclick = function() {
+                        const formData = new FormData(form);
+                        fetch(`/services/${serviceId}/update/`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                location.reload();
+                            } else {
+                                alert('Error updating service');
+                            }
+                        });
+                    };
+                });
+        });
+    });
+
+    // Delete Service
+    const deleteButtons = document.querySelectorAll('.delete-service');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete this service?')) {
+                const serviceId = this.dataset.serviceId;
+                fetch(`/services/${serviceId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error deleting service');
+                    }
+                });
+            }
+        });
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}
+{% endblock %} 
