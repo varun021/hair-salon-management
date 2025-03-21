@@ -1,7 +1,9 @@
 # forms.py
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, PasswordChangeForm
-from .models import User, Appointment, Service, AppointmentService, Payment
+from .models import User, Appointment, Service, AppointmentService, Payment, TimeSlot
+from django.utils import timezone
+from datetime import datetime
 
 
 class SignInForm(AuthenticationForm):
@@ -48,14 +50,43 @@ class AppointmentForm(forms.ModelForm):
         label="Select Services"
     )
     
+    time_slot = forms.ModelChoiceField(
+        queryset=TimeSlot.objects.none(),
+        empty_label="Select Time Slot",
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        required=True
+    )
+    
     class Meta:
         model = Appointment
-        fields = ['services', 'date', 'time', 'notes']
+        fields = ['services', 'date', 'time_slot', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Any special requests?'}),
+            'date': forms.DateInput(attrs={
+                'type': 'date', 
+                'class': 'form-control',
+                'min': timezone.now().date().isoformat()
+            }),
+            'notes': forms.Textarea(attrs={
+                'rows': 3, 
+                'class': 'form-control', 
+                'placeholder': 'Any special requests?'
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'date' in self.data:
+            try:
+                date = datetime.strptime(self.data['date'], '%Y-%m-%d').date()
+                # Get available time slots for the selected date
+                booked_slots = Appointment.objects.filter(
+                    date=date
+                ).values_list('time_slot', flat=True)
+                self.fields['time_slot'].queryset = TimeSlot.objects.filter(
+                    is_active=True
+                ).exclude(id__in=booked_slots)
+            except (ValueError, TypeError):
+                pass
 
 class ProfileUpdateForm(forms.ModelForm):
     """Form for users to update their profile information."""
@@ -125,4 +156,21 @@ class UserEditForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'user_type': forms.Select(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+class TimeSlotForm(forms.ModelForm):
+    start_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+        help_text='Enter start time in 24-hour format'
+    )
+    end_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+        help_text='Enter end time in 24-hour format'
+    )
+
+    class Meta:
+        model = TimeSlot
+        fields = ['start_time', 'end_time', 'is_active']
+        widgets = {
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }

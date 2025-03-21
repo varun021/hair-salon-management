@@ -2,321 +2,792 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Welcome Section -->
-    <div class="row mb-4">
-        <div class="col-lg-8">
-            <div class="card bg-primary text-white">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <h2 class="mb-1">Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
-                        <p class="mb-0">Manage your appointments and services</p>
-                    </div>
-                    <div class="text-end">
-                        <h4 class="mb-1">Loyalty Points</h4>
-                        <h3 class="mb-0">{{ loyalty_points.points }} <i class="fas fa-star text-warning"></i></h3>
-                    </div>
+<div class="dashboard">
+  <!-- Header Section with User Info and Quick Actions -->
+  <div class="dashboard-header">
+    <div class="user-welcome">
+      <h1>Hello, {{ user.get_full_name|default:user.username }}</h1>
+      <p class="subtitle">Your personal dashboard</p>
+    </div>
+    <div class="user-stats">
+      <div class="loyalty-points">
+        <span class="points-value">{{ loyalty_points.points }}</span>
+        <span class="points-label">Loyalty Points</span>
+      </div>
+      <div class="quick-actions">
+        <a href="{% url 'book_appointment' %}" class="action-button primary">Book Appointment</a>
+        <a href="{% url 'profile' %}" class="action-button secondary">Profile</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="dashboard-content">
+    <!-- Notifications Panel -->
+    <div class="dashboard-panel notifications-panel">
+      <div class="panel-header">
+        <h2>
+          Notifications
+          {% if unread_notifications %}
+            <span class="badge">{{ unread_notifications.count }}</span>
+          {% endif %}
+        </h2>
+        {% if notifications %}
+          <button class="text-button" onclick="markAllAsRead()">Mark all as read</button>
+        {% endif %}
+      </div>
+      
+      <div class="panel-content scrollable">
+        {% if notifications %}
+          <ul class="notifications-list">
+            {% for notification in notifications %}
+              <li class="notification-item {% if not notification.is_read %}unread{% endif %}" data-notification-id="{{ notification.id }}">
+                <div class="notification-content">
+                  <h3>{{ notification.title }}</h3>
+                  <p>{{ notification.message }}</p>
+                  <span class="timestamp">{{ notification.created_at|timesince }} ago</span>
                 </div>
-            </div>
-        </div>
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Quick Actions</h5>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'book_appointment' %}" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus me-2"></i>Book New Appointment
-                        </a>
-                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-user-edit me-2"></i>Update Profile
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+                {% if not notification.is_read %}
+                  <button class="mark-read-btn" aria-label="Mark as read"></button>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="empty-state">
+            <p>No notifications</p>
+          </div>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- Notifications -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-bell me-2"></i>Notifications
-                        {% if unread_notifications %}
-                            <span class="badge bg-danger">{{ unread_notifications.count }}</span>
-                        {% endif %}
-                    </h5>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="markAllAsRead()">
-                        Mark all as read
-                    </button>
+    <!-- Upcoming Appointments Panel -->
+    <div class="dashboard-panel appointments-panel">
+      <div class="panel-header">
+        <h2>Upcoming Appointments</h2>
+      </div>
+      
+      <div class="panel-content">
+        {% if upcoming_appointments %}
+          <ul class="appointments-list">
+            {% for appointment in upcoming_appointments %}
+              <li class="appointment-item">
+                <div class="appointment-date">
+                  <span class="day">{{ appointment.date|date:"d" }}</span>
+                  <span class="month">{{ appointment.date|date:"M" }}</span>
                 </div>
-                <div class="card-body notification-list" style="max-height: 300px; overflow-y: auto;">
-                    {% if notifications %}
-                        {% for notification in notifications %}
-                            <div class="notification-item p-3 {% if not notification.is_read %}unread{% endif %}"
-                                 data-notification-id="{{ notification.id }}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-1">{{ notification.title }}</h6>
-                                        <p class="mb-1">{{ notification.message }}</p>
-                                        <small class="text-muted">
-                                            {{ notification.created_at|timesince }} ago
-                                        </small>
-                                    </div>
-                                    {% if not notification.is_read %}
-                                        <button class="btn btn-sm btn-link mark-read-btn">
-                                            Mark as read
-                                        </button>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-muted text-center mb-0">No notifications</p>
-                    {% endif %}
+                
+                <div class="appointment-details">
+                  <div class="services">
+                    {% for service in appointment.appointment_services.all %}
+                      <span class="service-name">{{ service.service.name }}</span>
+                    {% endfor %}
+                  </div>
+                  <div class="time-status">
+                    <span class="time">{{ appointment.time|time:"g:i A" }}</span>
+                    <span class="status status-{{ appointment.status|lower }}">{{ appointment.status }}</span>
+                  </div>
+                  <div class="price">${{ appointment.calculate_grand_total|floatformat:2 }}</div>
                 </div>
-            </div>
-        </div>
+                
+                <div class="appointment-actions">
+                  {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
+                    <a href="{% url 'reschedule_appointment' appointment.id %}" class="icon-button" aria-label="Reschedule">
+                      <i class="fas fa-clock"></i>
+                    </a>
+                    <a href="{% url 'cancel_appointment' appointment.id %}" 
+                       class="icon-button danger" 
+                       aria-label="Cancel"
+                       onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                      <i class="fas fa-times"></i>
+                    </a>
+                  {% endif %}
+                  {% if appointment.status == "Completed" and not appointment.payment %}
+                    <a href="{% url 'process_payment' appointment.id %}" class="icon-button success" aria-label="Pay now">
+                      <i class="fas fa-credit-card"></i>
+                    </a>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="empty-state">
+            <i class="fas fa-calendar-alt"></i>
+            <p>No upcoming appointments</p>
+            <a href="{% url 'book_appointment' %}" class="action-button primary">Book Now</a>
+          </div>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- Upcoming Appointments -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Upcoming Appointments</h5>
+    <!-- History Panel -->
+    <div class="dashboard-panel history-panel">
+      <div class="panel-header">
+        <h2>Appointment History</h2>
+        <button class="toggle-button" type="button" data-bs-toggle="collapse" data-bs-target="#pastAppointments">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      
+      <div class="panel-content collapse show" id="pastAppointments">
+        {% if past_appointments %}
+          <ul class="history-list">
+            {% for appointment in past_appointments %}
+              <li class="history-item">
+                <div class="history-date">
+                  {{ appointment.date|date:"M d" }}
                 </div>
-                <div class="card-body">
-                    {% if upcoming_appointments %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Service(s)</th>
-                                        <th>Date & Time</th>
-                                        <th>Status</th>
-                                        <th>Total</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for appointment in upcoming_appointments %}
-                                    <tr>
-                                        <td>
-                                            {% for service in appointment.appointment_services.all %}
-                                                <div>{{ service.service.name }}</div>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            <div>{{ appointment.date|date:"F d, Y" }}</div>
-                                            <small class="text-muted">{{ appointment.time|time:"g:i A" }}</small>
-                                        </td>
-                                        <td>
-                                            {% if appointment.status == 'Confirmed' %}
-                                                <span class="badge bg-success">{{ appointment.status }}</span>
-                                            {% elif appointment.status == 'Pending' %}
-                                                <span class="badge bg-warning">{{ appointment.status }}</span>
-                                            {% elif appointment.status == 'Completed' %}
-                                                <span class="badge bg-info">{{ appointment.status }}</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">{{ appointment.status }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
-                                        <td>
-                                            {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
-                                                <div class="btn-group">
-                                                    <a href="{% url 'reschedule_appointment' appointment.id %}" 
-                                                       class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-clock me-1"></i>Reschedule
-                                                    </a>
-                                                    <a href="{% url 'cancel_appointment' appointment.id %}" 
-                                                       class="btn btn-sm btn-outline-danger"
-                                                       onclick="return confirm('Are you sure you want to cancel this appointment?')">
-                                                        <i class="fas fa-times me-1"></i>Cancel
-                                                    </a>
-                                                </div>
-                                            {% endif %}
-                                            {% if appointment.status == "Completed" and not appointment.payment %}
-                                                <a href="{% url 'process_payment' appointment.id %}" 
-                                                   class="btn btn-sm btn-success">
-                                                    <i class="fas fa-credit-card me-1"></i>Pay Now
-                                                </a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                            <p class="mb-0">No upcoming appointments</p>
-                            <a href="{% url 'book_appointment' %}" class="btn btn-primary mt-3">
-                                Book an Appointment
-                            </a>
-                        </div>
-                    {% endif %}
+                
+                <div class="history-details">
+                  <div class="services">
+                    {% for service in appointment.appointment_services.all %}
+                      <span class="service-name">{{ service.service.name }}</span>
+                      <span class="service-qty">x{{ service.quantity }}</span>
+                    {% endfor %}
+                  </div>
                 </div>
-            </div>
-        </div>
+                
+                <div class="history-status">
+                  <span class="status status-{{ appointment.status|lower }}">{{ appointment.status }}</span>
+                </div>
+                
+                <div class="history-payment">
+                  <span class="price">${{ appointment.calculate_grand_total|floatformat:2 }}</span>
+                  {% if appointment.payment %}
+                    <span class="payment-status paid">Paid</span>
+                  {% elif appointment.status == 'Completed' %}
+                    <span class="payment-status pending">Pending</span>
+                  {% else %}
+                    <span class="payment-status na">N/A</span>
+                  {% endif %}
+                </div>
+                
+                <div class="history-actions">
+                  {% if appointment.status == 'Completed' and not appointment.payment %}
+                    <a href="{% url 'process_payment' appointment.id %}" class="text-button primary">Pay Now</a>
+                  {% elif appointment.payment %}
+                    <a href="{% url 'payment_confirmation' appointment.payment.id %}" class="text-button">View Receipt</a>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="empty-state">
+            <i class="fas fa-history"></i>
+            <p>No appointment history available</p>
+          </div>
+        {% endif %}
+      </div>
     </div>
-
-    <!-- Past Appointments -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-history me-2"></i>Appointment History
-                    </h5>
-                    <button class="btn btn-sm btn-outline-primary" type="button" 
-                            data-bs-toggle="collapse" data-bs-target="#pastAppointments">
-                        Toggle History
-                    </button>
-                </div>
-                <div class="collapse show" id="pastAppointments">
-                    <div class="card-body">
-                        {% if past_appointments %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Service(s)</th>
-                                            <th>Date & Time</th>
-                                            <th>Status</th>
-                                            <th>Total</th>
-                                            <th>Payment Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for appointment in past_appointments %}
-                                        <tr>
-                                            <td>
-                                                {% for service in appointment.appointment_services.all %}
-                                                    <div>{{ service.service.name }}</div>
-                                                    <small class="text-muted">
-                                                        Quantity: {{ service.quantity }}
-                                                    </small>
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                <div>{{ appointment.date|date:"F d, Y" }}</div>
-                                                <small class="text-muted">
-                                                    {{ appointment.time|time:"g:i A" }}
-                                                </small>
-                                            </td>
-                                            <td>
-                                                {% if appointment.status == 'Completed' %}
-                                                    <span class="badge bg-info">Completed</span>
-                                                {% elif appointment.status == 'Paid' %}
-                                                    <span class="badge bg-success">Paid</span>
-                                                {% elif appointment.status == 'Cancelled' %}
-                                                    <span class="badge bg-danger">Cancelled</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">{{ appointment.status }}</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
-                                            <td>
-                                                {% if appointment.payment %}
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check-circle me-1"></i>Paid
-                                                    </span>
-                                                {% elif appointment.status == 'Completed' %}
-                                                    <span class="badge bg-warning">
-                                                        <i class="fas fa-clock me-1"></i>Pending
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">N/A</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if appointment.status == 'Completed' and not appointment.payment %}
-                                                    <a href="{% url 'process_payment' appointment.id %}" 
-                                                       class="btn btn-primary btn-sm">
-                                                        <i class="fas fa-credit-card me-1"></i>Pay Now
-                                                    </a>
-                                                {% elif appointment.payment %}
-                                                    <a href="{% url 'payment_confirmation' appointment.payment.id %}" 
-                                                       class="btn btn-outline-secondary btn-sm">
-                                                        <i class="fas fa-receipt me-1"></i>View Receipt
-                                                    </a>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="text-center py-4">
-                                <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                                <p class="text-muted mb-0">No appointment history available</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <style>
-.notification-item {
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.3s;
+/* Base styles */
+:root {
+  --primary-color: #3a86ff;
+  --primary-dark: #2667cc;
+  --success-color: #2ecc71;
+  --danger-color: #e74c3c;
+  --warning-color: #f39c12;
+  --info-color: #3498db;
+  --gray-100: #f8f9fa;
+  --gray-200: #e9ecef;
+  --gray-300: #dee2e6;
+  --gray-400: #ced4da;
+  --gray-500: #adb5bd;
+  --gray-600: #6c757d;
+  --gray-700: #495057;
+  --gray-800: #343a40;
+  --gray-900: #212529;
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }
-.notification-item:last-child {
-    border-bottom: none;
+
+body {
+  font-family: var(--font-sans);
+  color: var(--gray-800);
+  background-color: var(--gray-100);
+  line-height: 1.5;
 }
-.notification-item.unread {
-    background-color: #f8f9fa;
+
+/* Dashboard container */
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
 }
-.notification-item:hover {
-    background-color: #f1f3f5;
+
+/* Header section */
+.dashboard-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
 }
+
+.user-welcome h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+  margin-bottom: var(--spacing-xs);
+}
+
+.subtitle {
+  color: var(--gray-600);
+  margin: 0;
+}
+
+.user-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+}
+
+.loyalty-points {
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  min-width: 120px;
+  box-shadow: var(--shadow-sm);
+}
+
+.points-value {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.points-label {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.quick-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.action-button.primary {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.action-button.primary:hover {
+  background-color: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+}
+
+.action-button.secondary {
+  background-color: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+.action-button.secondary:hover {
+  background-color: var(--gray-100);
+  color: var(--gray-900);
+}
+
+/* Main content area */
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+  .dashboard-content {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .history-panel {
+    grid-column: span 2;
+  }
+}
+
+/* Panel styles */
+.dashboard-panel {
+  background-color: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.panel-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .badge {
-    padding: 0.5em 0.8em;
+  background-color: var(--danger-color);
+  color: white;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 500;
+}
+
+.panel-content {
+  padding: var(--spacing-md);
+}
+
+.panel-content.scrollable {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Button styles */
+.text-button {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.text-button:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.text-button.primary {
+  color: var(--primary-color);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--gray-200);
+  color: var(--gray-700);
+  border: none;
+  transition: all 0.2s;
+}
+
+.icon-button:hover {
+  background-color: var(--gray-300);
+}
+
+.icon-button.danger {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: var(--danger-color);
+}
+
+.icon-button.danger:hover {
+  background-color: rgba(231, 76, 60, 0.2);
+}
+
+.icon-button.success {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--success-color);
+}
+
+.icon-button.success:hover {
+  background-color: rgba(46, 204, 113, 0.2);
+}
+
+.toggle-button {
+  background: none;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all 0.2s;
+}
+
+.toggle-button:hover {
+  background-color: var(--gray-200);
+  color: var(--gray-800);
+}
+
+/* Notifications list */
+.notifications-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notification-item {
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  border-bottom: 1px solid var(--gray-200);
+  transition: background-color 0.2s;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item.unread {
+  background-color: var(--gray-100);
+}
+
+.notification-item:hover {
+  background-color: var(--gray-100);
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-content h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.notification-content p {
+  margin: 0 0 var(--spacing-xs) 0;
+  color: var(--gray-700);
+  font-size: 0.875rem;
+}
+
+.timestamp {
+  color: var(--gray-500);
+  font-size: 0.75rem;
+}
+
+.mark-read-btn {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: var(--spacing-sm);
+}
+
+.mark-read-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Appointments list */
+.appointments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.appointment-item {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--gray-200);
+  gap: var(--spacing-md);
+}
+
+.appointment-item:last-child {
+  border-bottom: none;
+}
+
+.appointment-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 50px;
+}
+
+.day {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.month {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.appointment-details {
+  flex: 1;
+}
+
+.services {
+  margin-bottom: var(--spacing-xs);
+}
+
+.service-name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.service-name:not(:last-child)::after {
+  content: ", ";
+}
+
+.time-status {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.time {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+}
+
+.status {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.status-confirmed {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--success-color);
+}
+
+.status-pending {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--warning-color);
+}
+
+.status-completed {
+  background-color: rgba(52, 152, 219, 0.1);
+  color: var(--info-color);
+}
+
+.status-cancelled {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: var(--danger-color);
+}
+
+.price {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.appointment-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* History list */
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 80px 2fr 1fr 1fr auto;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--gray-200);
+  gap: var(--spacing-md);
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-date {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+}
+
+.service-qty {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-left: var(--spacing-xs);
+}
+
+.payment-status {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: var(--spacing-sm);
+}
+
+.payment-status.paid {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: var(--success-color);
+}
+
+.payment-status.pending {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: var(--warning-color);
+}
+
+.payment-status.na {
+  background-color: var(--gray-200);
+  color: var(--gray-600);
+}
+
+.history-actions {
+  text-align: right;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) 0;
+  color: var(--gray-500);
+  text-align: center;
+}
+
+.empty-state i {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.empty-state p {
+  margin-bottom: var(--spacing-md);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-lg);
+  }
+  
+  .user-stats {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+  
+  .loyalty-points {
+    width: 100%;
+  }
+  
+  .quick-actions {
+    width: 100%;
+  }
+  
+  .action-button {
+    flex: 1;
+  }
+  
+  .history-item {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+  
+  .history-date, .history-details, .history-status, .history-payment, .history-actions {
+    padding: var(--spacing-xs) 0;
+  }
+  
+  .history-actions {
+    text-align: left;
+  }
 }
 </style>
 
 <script>
 function markAllAsRead() {
-    fetch('{% url "mark_all_notifications_read" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
+  fetch('{% url "mark_all_notifications_read" %}', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    }
+  });
 }
 
 document.querySelectorAll('.mark-read-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        const notificationId = this.closest('.notification-item').dataset.notificationId;
-        fetch(`/notifications/${notificationId}/mark-read/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                this.closest('.notification-item').classList.remove('unread');
-                this.remove();
-            }
-        });
+  button.addEventListener('click', function() {
+    const notificationItem = this.closest('.notification-item');
+    const notificationId = notificationItem.dataset.notificationId;
+    
+    fetch(`/notifications/${notificationId}/mark-read/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        notificationItem.classList.remove('unread');
+        this.remove();
+      }
     });
+  });
+});
+
+// Add smooth collapse animation for the history panel
+document.querySelector('.toggle-button').addEventListener('click', function() {
+  const icon = this.querySelector('i');
+  if (icon.classList.contains('fa-chevron-down')) {
+    icon.classList.remove('fa-chevron-down');
+    icon.classList.add('fa-chevron-up');
+  } else {
+    icon.classList.remove('fa-chevron-up');
+    icon.classList.add('fa-chevron-down');
+  }
 });
 </script>
 {% endblock %}

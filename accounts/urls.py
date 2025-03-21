@@ -37,4 +37,9 @@ urlpatterns = [
     path('dashboard/admin/settings/', views.admin_settings, name='admin_settings'),
     path('dashboard/admin/user/<int:user_id>/activate/', views.activate_user, name='activate_user'),
     path('dashboard/admin/user/<int:user_id>/deactivate/', views.deactivate_user, name='deactivate_user'),
+    path('notifications/', views.notifications_list, name='notifications'),
+    path('time-slots/', views.manage_time_slots, name='manage_time_slots'),
+    path('time-slots/edit/<int:slot_id>/', views.edit_time_slot, name='edit_time_slot'),
+    path('time-slots/delete/<int:slot_id>/', views.delete_time_slot, name='delete_time_slot'),
+    path('get-available-slots/', views.get_available_slots, name='get_available_slots'),
 ]

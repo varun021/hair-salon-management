@@ -40,6 +40,27 @@ class Service(models.Model):
         ordering = ['name']
 
 
+class TimeSlot(models.Model):
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_timeslots')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['start_time']
+        unique_together = ['start_time', 'end_time']
+
+    def __str__(self):
+        return f"{self.start_time.strftime('%I:%M %p')} - {self.end_time.strftime('%I:%M %p')}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.end_time <= self.start_time:
+            raise ValidationError('End time must be after start time')
+
+
 class Payment(models.Model):
     PAYMENT_STATUS = (
         ('PENDING', 'Pending'),
@@ -88,7 +109,7 @@ class Appointment(models.Model):
     client = models.ForeignKey(User, on_delete=models.CASCADE)
     services = models.ManyToManyField(Service, through=AppointmentService)
     date = models.DateField()
-    time = models.TimeField()
+    time_slot = models.ForeignKey(TimeSlot, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=[
@@ -121,7 +142,7 @@ class Appointment(models.Model):
         return self.calculate_total() + self.calculate_tax()
 
     def __str__(self):
-        return f"{self.client.username} - {self.date} at {self.time}"
+        return f"{self.client.username} - {self.date} at {self.time_slot}"
 
     def complete_appointment(self):
         """Mark appointment as completed and award loyalty points"""

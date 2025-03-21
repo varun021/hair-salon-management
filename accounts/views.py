@@ -4,15 +4,23 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import uuid
 from .forms import SignUpForm, ForgotPasswordForm, ResetPasswordForm, SignInForm, AppointmentForm, ChangePasswordForm, \
-    ProfileUpdateForm, ServiceForm, PaymentForm, EmployeeCreationForm, UserEditForm
-from .models import User, Appointment, Service, LoyaltyPoint, Payment, AppointmentService, Notification
+    ProfileUpdateForm, ServiceForm, PaymentForm, EmployeeCreationForm, UserEditForm, TimeSlotForm
+from .models import User, Appointment, Service, LoyaltyPoint, Payment, AppointmentService, Notification, TimeSlot
 from django.http import HttpResponseForbidden, JsonResponse
 from django.template.loader import render_to_string
 from .utils import create_notification
 from django.db import models
+from rest_framework import viewsets, permissions
+from .serializers import AppointmentSerializer, ServiceSerializer
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from django.db.models.functions import TruncMonth
+from django.db.models import Count, Sum
 
 
 def is_employee(user):
@@ -133,11 +141,14 @@ def book_appointment(request):
                     quantity=1  # Default quantity
                 )
             
+            # Format time from time_slot for notification
+            appointment_time = appointment.time_slot.start_time.strftime('%I:%M %p')
+            
             create_notification(
                 request.user,
                 'APPOINTMENT',
                 'Appointment Booked',
-                f'Your appointment for {appointment.date} at {appointment.time} has been booked successfully.'
+                f'Your appointment for {appointment.date} at {appointment_time} has been booked successfully.'
             )
             
             messages.success(request, "Your appointment has been booked successfully!")
@@ -152,7 +163,6 @@ def book_appointment(request):
         "services": Service.objects.filter(is_active=True)
     }
     return render(request, "appointments/book_appointment.html", context)
-
 
 @login_required
 def cancel_appointment(request, appointment_id):
@@ -247,55 +257,31 @@ def user_logout(request):
 @login_required
 @user_passes_test(is_employee)
 def employee_dashboard(request):
-    """Employee Dashboard View"""
+    # Get today's date
     today = timezone.now().date()
     
-    # Get all services
-    services = Service.objects.all().order_by('-created_at')
-    
-    # Get appointments by status with prefetched data
-    pending_appointments = Appointment.objects.filter(
-        status='Pending'
+    # Get all appointments for today onwards
+    appointments = Appointment.objects.filter(
+        date__gte=today
     ).select_related(
-        'client'
+        'client', 'time_slot'
     ).prefetch_related(
-        'appointment_services',
-        'appointment_services__service'
-    ).order_by('date', 'time')
+        'services'
+    ).order_by('date', 'time_slot__start_time')
 
-    confirmed_appointments = Appointment.objects.filter(
-        status='Confirmed'
-    ).select_related(
-        'client'
-    ).prefetch_related(
-        'appointment_services',
-        'appointment_services__service'
-    ).order_by('date', 'time')
+    # Get upcoming appointments (next 7 days)
+    upcoming_appointments = appointments.filter(
+        date__range=[today, today + timedelta(days=7)]
+    )
 
-    completed_appointments = Appointment.objects.filter(
-        status__in=['Completed', 'Paid']
-    ).select_related(
-        'client'
-    ).prefetch_related(
-        'appointment_services',
-        'appointment_services__service',
-        'payment'
-    ).order_by('-date', '-time')[:10]
-
-    # Get appointment counts
-    appointment_counts = {
-        'pending': Appointment.objects.filter(status='Pending').count(),
-        'confirmed': Appointment.objects.filter(status='Confirmed').count(),
-        'completed': Appointment.objects.filter(status__in=['Completed', 'Paid']).count(),
-        'cancelled': Appointment.objects.filter(status='Cancelled').count(),
-    }
+    # Get pending appointments
+    pending_appointments = appointments.filter(status='Pending')
 
     context = {
-        'services': services,
+        'appointments': appointments,
+        'upcoming_appointments': upcoming_appointments,
         'pending_appointments': pending_appointments,
-        'confirmed_appointments': confirmed_appointments,
-        'completed_appointments': completed_appointments,
-        'appointment_counts': appointment_counts,
+        'today': today,
     }
     
     return render(request, 'dashboards/employee_dashboard.html', context)
@@ -402,7 +388,9 @@ def client_dashboard(request):
         client=user,
         date__gte=today,
         status__in=['Pending', 'Confirmed']
-    ).prefetch_related('appointment_services__service').order_by('date', 'time')
+    ).select_related('time_slot').prefetch_related(
+        'appointment_services__service'
+    ).order_by('date', 'time_slot__start_time')
     
     # Fetch completed and past appointments
     past_appointments = Appointment.objects.filter(
@@ -410,10 +398,12 @@ def client_dashboard(request):
     ).filter(
         models.Q(status__in=['Completed', 'Paid']) |  # Completed or paid appointments
         models.Q(date__lt=today)  # Past appointments
+    ).select_related(
+        'time_slot'
     ).prefetch_related(
         'appointment_services__service',
         'payment'  # Include payment information
-    ).order_by('-date', '-time')
+    ).order_by('-date', '-time_slot__start_time')
     
     # Get loyalty points
     loyalty_points, _ = LoyaltyPoint.objects.get_or_create(client=user)
@@ -441,11 +431,11 @@ def update_profile(request):
                 return redirect('admin_dashboard')
             elif request.user.user_type == 'EMPLOYEE':
                 return redirect('employee_dashboard')
-            else:
+        else:
                 return redirect('client_dashboard')
     else:
         form = ProfileUpdateForm(instance=request.user)
-    
+
     return render(request, 'profile/update_profile.html', {'form': form})
 
 
@@ -667,3 +657,188 @@ def deactivate_user(request, user_id):
         user.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    """API endpoint for appointments"""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AppointmentSerializer
+
+    def get_queryset(self):
+        if self.request.user.user_type == 'CLIENT':
+            return Appointment.objects.filter(client=self.request.user)
+        elif self.request.user.user_type in ['EMPLOYEE', 'ADMIN']:
+            return Appointment.objects.all()
+        return Appointment.objects.none()
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reschedule_appointment_api(request, appointment_id):
+    """API endpoint for rescheduling appointments"""
+    appointment = get_object_or_404(Appointment, id=appointment_id)
+    if request.user != appointment.client and request.user.user_type not in ['EMPLOYEE', 'ADMIN']:
+        return Response({'error': 'Not authorized'}, status=403)
+    
+    serializer = AppointmentRescheduleSerializer(data=request.data)
+    if serializer.is_valid():
+        appointment.date = serializer.validated_data['date']
+        appointment.time = serializer.validated_data['time']
+        appointment.save()
+        return Response({'success': True})
+    return Response(serializer.errors, status=400)
+
+@login_required
+def search_appointments(request):
+    """Search appointments with filters"""
+    query = request.GET.get('q', '')
+    status = request.GET.get('status', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    appointments = Appointment.objects.all()
+
+    if query:
+        appointments = appointments.filter(
+            Q(client__username__icontains=query) |
+            Q(client__email__icontains=query) |
+            Q(services__name__icontains=query)
+        ).distinct()    
+    if status:
+        appointments = appointments.filter(status=status)
+    else:
+        appointments = appointments.all()
+
+    if date_from:
+        appointments = appointments.filter(date__gte=date_from)
+
+    if date_to:
+        appointments = appointments.filter(date__lte=date_to)
+
+    return render(request, 'appointments/search_results.html', {
+        'appointments': appointments,
+        'query': query,
+        'status': status,
+        'date_from': date_from,
+        'date_to': date_to
+    })
+@login_required
+@user_passes_test(lambda u: u.user_type == 'ADMIN')
+def analytics_dashboard(request):
+    """Advanced analytics dashboard"""
+    # Monthly revenue trend
+    monthly_revenue = Payment.objects.annotate(
+        month=TruncMonth('payment_date')
+    ).values('month').annotate(
+        total=Sum('total_amount')
+    ).order_by('month')
+
+    # Service popularity
+    popular_services = AppointmentService.objects.values(
+        'service__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
+
+    # Customer retention
+    repeat_customers = User.objects.filter(
+        user_type='CLIENT'
+    ).annotate(
+        appointment_count=Count('appointment')
+    ).filter(appointment_count__gt=1).count()
+
+    context = {
+        'monthly_revenue': monthly_revenue,
+        'popular_services': popular_services,
+        'repeat_customers': repeat_customers,
+        # Add more analytics data...
+    }
+    return render(request, 'admin/analytics.html', context)
+
+@login_required
+def notifications_list(request):
+    """Display all notifications for the user"""
+    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    
+    # Mark all as read when visiting the page
+    unread_notifications = notifications.filter(is_read=False)
+    unread_notifications.update(is_read=True)
+    
+    context = {
+        'notifications': notifications,
+        'unread_count': unread_notifications.count()
+    }
+    return render(request, 'notifications/notifications_list.html', context)
+
+# Add these views
+
+@login_required
+@user_passes_test(is_employee)
+def manage_time_slots(request):
+    """View for managing time slots"""
+    time_slots = TimeSlot.objects.all().order_by('start_time')
+    form = TimeSlotForm()
+
+    if request.method == 'POST':
+        form = TimeSlotForm(request.POST)
+        if form.is_valid():
+            time_slot = form.save(commit=False)
+            time_slot.created_by = request.user
+            time_slot.save()
+            messages.success(request, 'Time slot added successfully!')
+            return redirect('manage_time_slots')
+
+    context = {
+        'time_slots': time_slots,
+        'form': form
+    }
+    return render(request, 'time_slots/manage_time_slots.html', context)
+
+@login_required
+@user_passes_test(is_employee)
+def edit_time_slot(request, slot_id):
+    """Edit existing time slot"""
+    time_slot = get_object_or_404(TimeSlot, id=slot_id)
+    
+    if request.method == 'POST':
+        form = TimeSlotForm(request.POST, instance=time_slot)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Time slot updated successfully!')
+            return redirect('manage_time_slots')
+    else:
+        form = TimeSlotForm(instance=time_slot)
+    
+    return render(request, 'time_slots/edit_time_slot.html', {'form': form})
+
+@login_required
+@user_passes_test(is_employee)
+def delete_time_slot(request, slot_id):
+    """Delete time slot"""
+    time_slot = get_object_or_404(TimeSlot, id=slot_id)
+    time_slot.delete()
+    messages.success(request, 'Time slot deleted successfully!')
+    return redirect('manage_time_slots')
+
+@login_required
+def get_available_slots(request):
+    """AJAX endpoint to get available time slots for a date"""
+    date_str = request.GET.get('date')
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        # Get already booked slots for the date
+        booked_slots = Appointment.objects.filter(
+            date=date
+        ).values_list('time_slot', flat=True)
+        
+        # Get available time slots
+        available_slots = TimeSlot.objects.filter(
+            is_active=True
+        ).exclude(id__in=booked_slots)
+        
+        slots_data = [{
+            'id': slot.id,
+            'time': f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}"
+        } for slot in available_slots]
+        
+        return JsonResponse({'slots': slots_data})
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid date'}, status=400)
