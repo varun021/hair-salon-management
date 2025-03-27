@@ -84,11 +84,45 @@ class AppointmentService(models.Model):
     def total(self):
         return self.price * self.quantity
 
+class TimeSlot(models.Model):
+    """Model to represent predefined time slots for appointments"""
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['start_time']
+        unique_together = ['start_time', 'end_time']
+    
+    def __str__(self):
+        return f"{self.start_time.strftime('%I:%M %p')} - {self.end_time.strftime('%I:%M %p')}"
+    
+    @classmethod
+    def get_available_slots(cls, date):
+        """Get available time slots for a specific date"""
+        # Get all time slots
+        all_slots = cls.objects.filter(is_active=True)
+        
+        # Get booked appointments for this date
+        booked_appointments = Appointment.objects.filter(
+            date=date, 
+            status__in=["Pending", "Confirmed"]
+        )
+        
+        # Get booked time slots
+        booked_slots = [appointment.time_slot.id for appointment in booked_appointments if appointment.time_slot]
+        
+        # Filter out booked slots
+        available_slots = all_slots.exclude(id__in=booked_slots)
+        
+        return available_slots
+
 class Appointment(models.Model):
     client = models.ForeignKey(User, on_delete=models.CASCADE)
     services = models.ManyToManyField(Service, through=AppointmentService)
     date = models.DateField()
-    time = models.TimeField()
+    time_slot = models.ForeignKey(TimeSlot, on_delete=models.SET_NULL, null=True, blank=True)
+    time = models.TimeField(null=True, blank=True)  # Keeping for backward compatibility
     status = models.CharField(
         max_length=20,
         choices=[
@@ -103,6 +137,12 @@ class Appointment(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # If time_slot is set, update the time field for backward compatibility
+        if self.time_slot and not self.time:
+            self.time = self.time_slot.start_time
+        super().save(*args, **kwargs)
 
     def calculate_total(self):
         """Calculate total before tax"""

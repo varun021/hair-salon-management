@@ -1,7 +1,7 @@
 # forms.py
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, PasswordChangeForm
-from .models import User, Appointment, Service, AppointmentService, Payment
+from .models import User, Appointment, Service, AppointmentService, Payment, TimeSlot
 
 
 class SignInForm(AuthenticationForm):
@@ -48,14 +48,33 @@ class AppointmentForm(forms.ModelForm):
         label="Select Services"
     )
     
+    time_slot = forms.ModelChoiceField(
+        queryset=TimeSlot.objects.none(),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Select Time Slot",
+        empty_label="Select a date first"
+    )
+    
     class Meta:
         model = Appointment
-        fields = ['services', 'date', 'time', 'notes']
+        fields = ['services', 'date', 'time_slot', 'notes']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control', 'id': 'appointment-date'}),
             'notes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Any special requests?'}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # If we have an instance and it has a date, load the available time slots
+        if self.instance and self.instance.pk and self.instance.date:
+            self.fields['time_slot'].queryset = TimeSlot.get_available_slots(self.instance.date)
+            
+            # If the instance already has a time_slot, include it in the queryset
+            if self.instance.time_slot:
+                current_slot = TimeSlot.objects.filter(pk=self.instance.time_slot.pk)
+                self.fields['time_slot'].queryset = self.fields['time_slot'].queryset | current_slot
 
 class ProfileUpdateForm(forms.ModelForm):
     """Form for users to update their profile information."""

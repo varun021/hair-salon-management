@@ -2,7 +2,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import path
 from . import views
 from .views import user_logout, client_dashboard, book_appointment, cancel_appointment, reschedule_appointment, \
-    update_profile, change_password, complete_appointment
+    update_profile, change_password, complete_appointment, get_available_time_slots
 
 urlpatterns = [
     path('', views.landing_page, name='landing_page'),
@@ -15,6 +15,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('client-dashboard/', client_dashboard, name='client_dashboard'),
     path('book-appointment/', book_appointment, name='book_appointment'),
+    path('get-time-slots/', get_available_time_slots, name='get_time_slots'),
     path('complete-appointment/<int:appointment_id>/', complete_appointment, name='complete_appointment'),
     path('cancel-appointment/<int:appointment_id>/', cancel_appointment, name='cancel_appointment'),
     path('reschedule-appointment/<int:appointment_id>/', reschedule_appointment, name='reschedule_appointment'),

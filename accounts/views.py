@@ -4,11 +4,11 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import uuid
 from .forms import SignUpForm, ForgotPasswordForm, ResetPasswordForm, SignInForm, AppointmentForm, ChangePasswordForm, \
     ProfileUpdateForm, ServiceForm, PaymentForm, EmployeeCreationForm, UserEditForm
-from .models import User, Appointment, Service, LoyaltyPoint, Payment, AppointmentService, Notification
+from .models import User, Appointment, Service, LoyaltyPoint, Payment, AppointmentService, Notification, TimeSlot
 from django.http import HttpResponseForbidden, JsonResponse
 from django.template.loader import render_to_string
 from .utils import create_notification
@@ -114,10 +114,56 @@ def reset_password(request, token):
 
 
 @login_required
+def get_available_time_slots(request):
+    """API endpoint to get available time slots for a given date"""
+    if request.method == "GET":
+        date_str = request.GET.get('date')
+        try:
+            # Parse the date string
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            
+            # Get available time slots
+            available_slots = TimeSlot.get_available_slots(selected_date)
+            
+            # Format the response
+            slots_data = [
+                {
+                    'id': slot.id,
+                    'text': str(slot)
+                }
+                for slot in available_slots
+            ]
+            
+            return JsonResponse({'slots': slots_data})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
 def book_appointment(request):
     """Allows users to book an appointment"""
     if request.method == "POST":
+        # Get the selected date and time_slot_id from POST data
+        selected_date = request.POST.get('date')
+        time_slot_id = request.POST.get('time_slot')
+        
+        # Create a form instance with the POST data
         form = AppointmentForm(request.POST)
+        
+        if selected_date and time_slot_id:
+            # Update the queryset to include the selected time slot
+            try:
+                selected_date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+                # Update the form's time_slot queryset to include all available slots for this date
+                # plus the specific selected one (even if it's already booked in case of edits)
+                available_slots = TimeSlot.get_available_slots(selected_date_obj)
+                selected_slot = TimeSlot.objects.filter(id=time_slot_id)
+                form.fields['time_slot'].queryset = available_slots | selected_slot
+            except (ValueError, TimeSlot.DoesNotExist):
+                pass  # Let form validation handle errors
+        
         if form.is_valid():
             appointment = form.save(commit=False)
             appointment.client = request.user
@@ -133,11 +179,14 @@ def book_appointment(request):
                     quantity=1  # Default quantity
                 )
             
+            # Get time slot text for notification
+            time_slot = form.cleaned_data['time_slot']
+            
             create_notification(
                 request.user,
                 'APPOINTMENT',
                 'Appointment Booked',
-                f'Your appointment for {appointment.date} at {appointment.time} has been booked successfully.'
+                f'Your appointment for {appointment.date} at {time_slot} has been booked successfully.'
             )
             
             messages.success(request, "Your appointment has been booked successfully!")
@@ -192,7 +241,25 @@ def reschedule_appointment(request, appointment_id):
         return redirect('client_dashboard')
 
     if request.method == "POST":
+        # Get the selected date and time_slot_id from POST data
+        selected_date = request.POST.get('date')
+        time_slot_id = request.POST.get('time_slot')
+        
+        # Create form instance with POST data
         form = AppointmentForm(request.POST, instance=appointment)
+        
+        if selected_date and time_slot_id:
+            # Update the queryset to include the selected time slot
+            try:
+                selected_date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+                # Update the form's time_slot queryset to include all available slots for this date
+                # plus the specific selected one
+                available_slots = TimeSlot.get_available_slots(selected_date_obj)
+                selected_slot = TimeSlot.objects.filter(id=time_slot_id)
+                form.fields['time_slot'].queryset = available_slots | selected_slot
+            except (ValueError, TimeSlot.DoesNotExist):
+                pass  # Let form validation handle errors
+        
         if form.is_valid():
             form.save()
             messages.success(request, "Appointment has been rescheduled.")
@@ -201,6 +268,13 @@ def reschedule_appointment(request, appointment_id):
             return redirect('client_dashboard')
     else:
         form = AppointmentForm(instance=appointment)
+        # Ensure time slots are loaded for the current date
+        if appointment.date:
+            form.fields['time_slot'].queryset = TimeSlot.get_available_slots(appointment.date)
+            # Include current time slot
+            if appointment.time_slot:
+                current_slot = TimeSlot.objects.filter(pk=appointment.time_slot.pk)
+                form.fields['time_slot'].queryset = form.fields['time_slot'].queryset | current_slot
 
     return render(request, "appointments/reschedule_appointment.html", {
         "form": form, 
