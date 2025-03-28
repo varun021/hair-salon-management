@@ -2,6 +2,344 @@
 {% load static %}
 
 {% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-grid">
+        <!-- User Overview Column -->
+        <div class="overview-column">
+            <!-- Welcome Card -->
+            <div class="card welcome-card">
+                <div class="card-body">
+                    <div class="welcome-header">
+                        <h2>Welcome, {{ user.get_full_name|default:user.username }}</h2>
+                        <div class="loyalty-points">
+                            <i class="fas fa-star"></i>
+                            <span>{{ loyalty_points.points }} Points</span>
+                        </div>
+                    </div>
+                    <div class="quick-actions">
+                        <a href="{% url 'book_appointment' %}" class="btn btn-primary">
+                            <i class="fas fa-calendar-plus"></i> Book Appointment
+                        </a>
+                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user-edit"></i> Edit Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Card -->
+            <div class="card notifications-card">
+                <div class="card-header">
+                    <h3>Notifications</h3>
+                    {% if unread_notifications %}
+                        <span class="badge">{{ unread_notifications.count }} New</span>
+                    {% endif %}
+                    <button class="btn btn-clear" onclick="markAllAsRead()">Clear All</button>
+                </div>
+                <div class="notification-list">
+                    {% if notifications %}
+                        {% for notification in notifications %}
+                            <div class="notification-item {% if not notification.is_read %}unread{% endif %}"
+                                 data-notification-id="{{ notification.id }}">
+                                <div class="notification-content">
+                                    <h4>{{ notification.title }}</h4>
+                                    <p>{{ notification.message }}</p>
+                                    <time>{{ notification.created_at|timesince }} ago</time>
+                                </div>
+                                {% if not notification.is_read %}
+                                    <button class="btn btn-mark-read mark-read-btn">Mark Read</button>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-notifications">
+                            <p>No new notifications</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointments Column -->
+        <div class="appointments-column">
+            <!-- Upcoming Appointments Card -->
+            <div class="card upcoming-appointments">
+                <div class="card-header">
+                    <h3>Upcoming Appointments</h3>
+                    <a href="{% url 'book_appointment' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-plus"></i> New
+                    </a>
+                </div>
+                <div class="appointment-list">
+                    {% if upcoming_appointments %}
+                        {% for appointment in upcoming_appointments %}
+                            <div class="appointment-item">
+                                <div class="appointment-details">
+                                    <div class="appointment-services">
+                                        {% for service in appointment.appointment_services.all %}
+                                            <span class="service-tag">{{ service.service.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="appointment-meta">
+                                        <div class="appointment-date">
+                                            <i class="fas fa-calendar"></i>
+                                            {{ appointment.date|date:"F d, Y" }}
+                                        </div>
+                                        <div class="appointment-time">
+                                            <i class="fas fa-clock"></i>
+                                            {{ appointment.time|time:"g:i A" }}
+                                        </div>
+                                    </div>
+                                    <div class="appointment-status">
+                                        {% if appointment.status == 'Confirmed' %}
+                                            <span class="status-badge confirmed">Confirmed</span>
+                                        {% elif appointment.status == 'Pending' %}
+                                            <span class="status-badge pending">Pending</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="appointment-actions">
+                                    {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
+                                        <a href="{% url 'reschedule_appointment' appointment.id %}" 
+                                           class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-clock"></i> Reschedule
+                                        </a>
+                                        <a href="{% url 'cancel_appointment' appointment.id %}" 
+                                           class="btn btn-outline-danger btn-sm"
+                                           onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-appointments">
+                            <p>No upcoming appointments</p>
+                            <a href="{% url 'book_appointment' %}" class="btn btn-primary">
+                                Book an Appointment
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Past Appointments Card -->
+            <div class="card past-appointments">
+                <div class="card-header">
+                    <h3>Appointment History</h3>
+                </div>
+                <div class="past-appointment-list">
+                    {% if past_appointments %}
+                        {% for appointment in past_appointments %}
+                            <div class="past-appointment-item">
+                                <div class="past-appointment-details">
+                                    <div class="past-services">
+                                        {% for service in appointment.appointment_services.all %}
+                                            <div class="service-detail">
+                                                <span>{{ service.service.name }}</span>
+                                                <small>Qty: {{ service.quantity }}</small>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="past-appointment-meta">
+                                        <div class="past-date">
+                                            {{ appointment.date|date:"F d, Y" }}
+                                        </div>
+                                        <div class="past-status">
+                                            {% if appointment.status == 'Completed' %}
+                                                <span class="status-badge completed">Completed</span>
+                                            {% elif appointment.status == 'Cancelled' %}
+                                                <span class="status-badge cancelled">Cancelled</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="past-appointment-actions">
+                                    {% if appointment.status == 'Completed' and not appointment.payment %}
+                                        <a href="{% url 'process_payment' appointment.id %}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-credit-card"></i> Pay Now
+                                        </a>
+                                    {% elif appointment.payment %}
+                                        <a href="{% url 'payment_confirmation' appointment.payment.id %}" 
+                                           class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-receipt"></i> Receipt
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-history">
+                            <p>No appointment history</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --background-color: #f4f6f9;
+    --text-color: #2c3e50;
+    --card-background: #ffffff;
+}
+
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: var(--background-color);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+}
+
+.card {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.welcome-card .card-body {
+    padding: 20px;
+}
+
+.welcome-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.notification-list,
+.appointment-list,
+.past-appointment-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notification-item,
+.appointment-item,
+.past-appointment-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.notification-item.unread {
+    background-color: #f8f9fa;
+}
+
+.appointment-details,
+.past-appointment-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.service-tag {
+    background-color: #f1f3f5;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-right: 5px;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.status-badge.confirmed { background-color: #2ecc71; color: white; }
+.status-badge.pending { background-color: #f39c12; color: white; }
+.status-badge.completed { background-color: #3498db; color: white; }
+.status-badge.cancelled { background-color: #e74c3c; color: white; }
+
+.no-notifications,
+.no-appointments,
+.no-history {
+    text-align: center;
+    padding: 20px;
+    color: #7f8c8d;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function markAllAsRead() {
+    fetch('{% url "mark_all_notifications_read" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+document.querySelectorAll('.mark-read-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const notificationId = this.closest('.notification-item').dataset.notificationId;
+        fetch(`/notifications/${notificationId}/mark-read/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.closest('.notification-item').classList.remove('unread');
+                this.remove();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+
+
+
+{% comment %} {% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
 <div class="container-fluid py-4">
     <!-- Welcome Section -->
     <div class="row mb-4">
@@ -319,4 +657,5 @@ document.querySelectorAll('.mark-read-btn').forEach(button => {
     });
 });
 </script>
-{% endblock %}
+{% endblock %} {% endcomment %}
+

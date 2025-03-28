@@ -2,15 +2,15 @@
 {% load widget_tweaks %}
 
 {% block content %}
-<div class="container">
+<div class="container my-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Book an Appointment</h3>
+            <div class="card shadow-sm rounded">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Book an Appointment</h3>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    <form method="post" novalidate>
                         {% csrf_token %}
                         
                         {% if form.errors %}
@@ -21,11 +21,11 @@
 
                         <!-- Services Selection -->
                         <div class="mb-4">
-                            <label class="form-label">{{ form.services.label }}</label>
+                            <label class="form-label fw-bold">{{ form.services.label }}</label>
                             <div class="row">
                                 {% for service in form.services %}
-                                <div class="col-md-6 mb-2">
-                                    <div class="card">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100 border-0 shadow-sm">
                                         <div class="card-body">
                                             <div class="form-check">
                                                 {{ service.tag }}
@@ -41,7 +41,7 @@
                                 {% endfor %}
                             </div>
                             {% if form.services.errors %}
-                            <div class="text-danger">
+                            <div class="text-danger small">
                                 {{ form.services.errors }}
                             </div>
                             {% endif %}
@@ -50,16 +50,16 @@
                         <!-- Date and Time Slots -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.date.id_for_label }}" class="form-label">Date</label>
+                                <label for="{{ form.date.id_for_label }}" class="form-label fw-bold">Date</label>
                                 {{ form.date|add_class:"form-control" }}
                                 {% if form.date.errors %}
-                                <div class="text-danger">
+                                <div class="text-danger small">
                                     {{ form.date.errors }}
                                 </div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.time_slot.id_for_label }}" class="form-label">Time Slot</label>
+                                <label for="{{ form.time_slot.id_for_label }}" class="form-label fw-bold">Time Slot</label>
                                 <select name="time_slot" id="{{ form.time_slot.id_for_label }}" class="form-control" disabled>
                                     <option value="">Select a date first</option>
                                 </select>
@@ -67,7 +67,7 @@
                                     <small class="text-muted">Loading available time slots...</small>
                                 </div>
                                 {% if form.time_slot.errors %}
-                                <div class="text-danger">
+                                <div class="text-danger small">
                                     {{ form.time_slot.errors }}
                                 </div>
                                 {% endif %}
@@ -76,18 +76,18 @@
 
                         <!-- Notes -->
                         <div class="mb-3">
-                            <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
-                            {{ form.notes }}
+                            <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">Notes</label>
+                            {{ form.notes|add_class:"form-control" }}
                             {% if form.notes.errors %}
-                            <div class="text-danger">
+                            <div class="text-danger small">
                                 {{ form.notes.errors }}
                             </div>
                             {% endif %}
                         </div>
 
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary">Book Appointment</button>
-                            <a href="{% url 'client_dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary px-4">Book Appointment</button>
+                            <a href="{% url 'client_dashboard' %}" class="btn btn-secondary px-4 ms-2">Cancel</a>
                         </div>
                     </form>
                 </div>
@@ -97,19 +97,16 @@
 </div>
 
 <style>
-.service-checkbox {
-    margin-right: 10px;
-}
-.card {
-    transition: all 0.3s ease;
-}
-.card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-.form-check-label {
-    width: 100%;
-    cursor: pointer;
-}
+    /* Custom card hover effect */
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    /* Improve form check label cursor and spacing */
+    .form-check-label {
+        cursor: pointer;
+        margin-left: 0.5rem;
+    }
 </style>
 
 <script>
