@@ -1,11 +1,183 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
 {% block content %}
-<div class="container">
-    <h2>Reschedule Appointment</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Reschedule</button>
-    </form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Reschedule Appointment</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Current Appointment Details -->
+                    <div class="current-details mb-4">
+                        <h6>Current Appointment Details</h6>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <p class="mb-2"><strong>Date:</strong> {{ appointment.date|date:"F d, Y" }}</p>
+                                <p class="mb-2"><strong>Time:</strong> {{ appointment.time_slot }}</p>
+                                <div class="services-list">
+                                    <strong>Services:</strong>
+                                    <ul class="list-unstyled mt-2">
+                                        {% for app_service in appointment.appointment_services.all %}
+                                            {% with service=app_service.service %}
+                                                {% if service.service_type == 'MAIN' %}
+                                                    <li class="main-service">
+                                                        {{ service.name }} - ${{ service.price }}
+                                                        <ul class="sub-services-list">
+                                                            {% for sub_app_service in appointment.appointment_services.all %}
+                                                                {% with sub_service=sub_app_service.service %}
+                                                                    {% if sub_service.service_type == 'SUB' and sub_service.parent_service == service %}
+                                                                        <li>{{ sub_service.name }} - ${{ sub_service.price }}</li>
+                                                                    {% endif %}
+                                                                {% endwith %}
+                                                            {% endfor %}
+                                                        </ul>
+                                                    </li>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reschedule Form -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            Please correct the errors below.
+                        </div>
+                        {% endif %}
+
+                        <!-- Date Selection -->
+                        <div class="mb-3">
+                            <label for="{{ form.date.id_for_label }}" class="form-label">New Date</label>
+                            {{ form.date|add_class:"form-control" }}
+                            {% if form.date.errors %}
+                            <div class="text-danger">
+                                {{ form.date.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Time Slot Selection -->
+                        <div class="mb-3">
+                            <label for="{{ form.time_slot.id_for_label }}" class="form-label">New Time Slot</label>
+                            {{ form.time_slot|add_class:"form-control" }}
+                            <div id="time-slot-loading" class="mt-2 d-none">
+                                <small class="text-muted">Loading available time slots...</small>
+                            </div>
+                            {% if form.time_slot.errors %}
+                            <div class="text-danger">
+                                {{ form.time_slot.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Hidden Fields -->
+                        {{ form.main_service.as_hidden }}
+                        {% for sub_service in form.sub_services.initial %}
+                            <input type="hidden" name="sub_services" value="{{ sub_service.id }}">
+                        {% endfor %}
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Reschedule Appointment</button>
+                            {% if request.user.user_type == 'EMPLOYEE' %}
+                                <a href="{% url 'employee_dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            {% else %}
+                                <a href="{% url 'client_dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+.services-list {
+    margin-top: 10px;
+}
+.main-service {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+.sub-services-list {
+    list-style: none;
+    padding-left: 20px;
+    margin-top: 5px;
+}
+.sub-services-list li {
+    font-weight: normal;
+    color: #666;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('appointment-date');
+    const timeSlotSelect = document.getElementById('{{ form.time_slot.id_for_label }}');
+    const loadingIndicator = document.getElementById('time-slot-loading');
+    
+    function fetchTimeSlots(date) {
+        loadingIndicator.classList.remove('d-none');
+        timeSlotSelect.disabled = true;
+        
+        while (timeSlotSelect.options.length > 1) {
+            timeSlotSelect.remove(1);
+        }
+        
+        fetch(`{% url 'get_time_slots' %}?date=${date}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.slots && data.slots.length > 0) {
+                    data.slots.forEach(slot => {
+                        const option = document.createElement('option');
+                        option.value = slot.id;
+                        option.textContent = slot.text;
+                        timeSlotSelect.appendChild(option);
+                    });
+                    timeSlotSelect.disabled = false;
+                    timeSlotSelect.options[0].text = 'Select a time slot';
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No time slots available for this date';
+                    timeSlotSelect.appendChild(option);
+                }
+                loadingIndicator.classList.add('d-none');
+            })
+            .catch(error => {
+                console.error('Error fetching time slots:', error);
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Error loading time slots';
+                timeSlotSelect.appendChild(option);
+                loadingIndicator.classList.add('d-none');
+            });
+    }
+    
+    dateInput.addEventListener('change', function() {
+        if (this.value) {
+            fetchTimeSlots(this.value);
+        } else {
+            timeSlotSelect.disabled = true;
+            while (timeSlotSelect.options.length > 1) {
+                timeSlotSelect.remove(1);
+            }
+            timeSlotSelect.options[0].text = 'Select a date first';
+        }
+    });
+    
+    if (dateInput.value) {
+        fetchTimeSlots(dateInput.value);
+    }
+});
+</script>
 {% endblock %}

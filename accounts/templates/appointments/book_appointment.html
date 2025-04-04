@@ -2,6 +2,790 @@
 {% load widget_tweaks %}
 
 {% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-lg">
+                <div class="card-header gradient-header py-3">
+                    <h3 class="card-title mb-0 text-center text-white">Book Your Appointment</h3>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" id="appointment-form">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <strong>Please correct the errors below.</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endif %}
+
+                        <!-- Progress Steps -->
+                        <div class="mb-4">
+                            <div class="progress" style="height: 3px;">
+                                <div class="progress-bar gradient-progress" role="progressbar" style="width: 25%;" id="progress-bar"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-2">
+                                <span class="step active" id="step1">Service</span>
+                                <span class="step" id="step2">Add-ons</span>
+                                <span class="step" id="step3">Date & Time</span>
+                                <span class="step" id="step4">Review</span>
+                            </div>
+                        </div>
+
+                        <!-- Service Selection Section -->
+                        <div class="form-section" id="service-section">
+                            <h4 class="section-title gradient-text mb-3">Select Your Service</h4>
+                            <div class="mb-4">
+                                <label class="form-label">{{ form.main_service.label }}</label>
+                                <select name="main_service" id="main-service" class="form-select">
+                                    <option value="">Please select a service</option>
+                                    {% for service in form.main_service.field.queryset %}
+                                    <option value="{{ service.id }}" {% if form.main_service.value|stringformat:"s" == service.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ service.name }} - ${{ service.price }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.main_service.errors %}
+                                <div class="text-danger mt-2">
+                                    {{ form.main_service.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-end mt-4">
+                                <button type="button" class="btn btn-gradient next-btn" id="to-addons-btn" disabled>Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-Services Selection Section -->
+                        <div class="form-section d-none" id="addons-section">
+                            <h4 class="section-title gradient-text mb-3">Select Add-on Services</h4>
+                            <div class="mb-4" id="sub-services-container">
+                                <label class="form-label">{{ form.sub_services.label }}</label>
+                                <div class="row g-3" id="sub-services-list">
+                                    <div class="col-12 text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 text-muted">Loading available add-ons...</p>
+                                    </div>
+                                </div>
+                                {% if form.sub_services.errors %}
+                                <div class="text-danger mt-2">
+                                    {{ form.sub_services.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between mt-4">
+                                <button type="button" class="btn btn-light prev-btn" id="back-to-service-btn">Back</button>
+                                <button type="button" class="btn btn-gradient next-btn" id="to-datetime-btn" disabled>Continue</button>
+                            </div>
+                        </div>
+
+                        <!-- Date and Time Section -->
+                        <div class="form-section d-none" id="datetime-section">
+                            <h4 class="section-title gradient-text mb-3">Choose Date & Time</h4>
+                            <div class="row g-3">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.date.id_for_label }}" class="form-label">Date</label>
+                                    {{ form.date|add_class:"form-control" }}
+                                    {% if form.date.errors %}
+                                    <div class="text-danger mt-2">
+                                        {{ form.date.errors }}
+                                    </div>
+                                    {% endif %}
+                                    <div class="form-text small">Select your preferred date</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.time_slot.id_for_label }}" class="form-label">Time</label>
+                                    <select name="time_slot" id="{{ form.time_slot.id_for_label }}" class="form-select" disabled>
+                                        <option value="">Select a date first</option>
+                                    </select>
+                                    <div id="time-slot-loading" class="mt-2 d-none">
+                                        <div class="d-flex align-items-center">
+                                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <small class="text-muted">Loading available times...</small>
+                                        </div>
+                                    </div>
+                                    {% if form.time_slot.errors %}
+                                    <div class="text-danger mt-2">
+                                        {{ form.time_slot.errors }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="mb-4 mt-3">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">Additional Notes</label>
+                                {{ form.notes|add_class:"form-control" }}
+                                <div class="form-text small">Any special requests or information</div>
+                                {% if form.notes.errors %}
+                                <div class="text-danger mt-2">
+                                    {{ form.notes.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mt-4">
+                                <button type="button" class="btn btn-light prev-btn" id="back-to-addons-btn">Back</button>
+                                <button type="button" class="btn btn-gradient next-btn" id="to-review-btn" disabled>Review</button>
+                            </div>
+                        </div>
+
+                        <!-- Review Section -->
+                        <div class="form-section d-none" id="review-section">
+                            <h4 class="section-title gradient-text mb-3">Review Your Appointment</h4>
+                            
+                            <div class="card mb-3 bg-light border-0 shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">Summary</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-2"><span class="text-muted">Service:</span> <span id="review-service"></span></p>
+                                            <p class="mb-2"><span class="text-muted">Date:</span> <span id="review-date"></span></p>
+                                            <p class="mb-2"><span class="text-muted">Time:</span> <span id="review-time"></span></p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p class="mb-2"><span class="text-muted">Add-ons:</span></p>
+                                            <ul id="review-addons" class="ps-3 small"></ul>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <p class="mb-2"><span class="text-muted">Notes:</span> <span id="review-notes" class="small">None</span></p>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <p class="mb-0"><span class="text-muted">Estimated Total:</span> <span id="review-total" class="gradient-text fw-bold">$0.00</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mt-4">
+                                <button type="button" class="btn btn-light prev-btn" id="back-to-datetime-btn">Back</button>
+                                <button type="submit" class="btn btn-gradient-success">Confirm Booking</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light py-3 text-center">
+                    <a href="{% url 'client_dashboard' %}" class="btn btn-link text-decoration-none">
+                        <i class="bi bi-arrow-left"></i> Return to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modern Gradient Styles */
+.gradient-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border: none;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+}
+
+.gradient-progress {
+    background: linear-gradient(to right, #6366f1, #8b5cf6);
+}
+
+.btn-gradient {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+    background: linear-gradient(135deg, #5254cc 0%, #7c50da 100%);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.15);
+}
+
+.btn-gradient:disabled {
+    background: #e9ecef;
+    color: #6c757d;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-gradient-success:hover {
+    background: linear-gradient(135deg, #0ea271 0%, #047857 100%);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.15);
+}
+
+/* Progress Indicator */
+.step {
+    position: relative;
+    font-size: 14px;
+    color: #9ca3af;
+    padding-top: 8px;
+}
+
+.step.active {
+    color: #6366f1;
+}
+
+.step.completed {
+    color: #10b981;
+}
+
+/* Form sections */
+.form-section {
+    transition: all 0.3s ease;
+    opacity: 1;
+}
+
+.section-title {
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
+
+/* Form Controls */
+.form-control, .form-select {
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #a5b4fc;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-label {
+    font-size: 14px;
+    color: #4b5563;
+    margin-bottom: 6px;
+}
+
+.form-text {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+/* Service Cards */
+.service-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    height: 100%;
+    padding: 12px;
+}
+
+.service-card:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 4px 6px rgba(99, 102, 241, 0.06);
+    transform: translateY(-2px);
+}
+
+.service-card.selected {
+    border-color: #6366f1;
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+.service-card .card-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.service-card .price {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-light {
+    background-color: #f9fafb;
+    border-color: #e5e7eb;
+    color: #4b5563;
+}
+
+.btn-light:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+/* Card Styles */
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elements
+    const form = document.getElementById('appointment-form');
+    const progressBar = document.getElementById('progress-bar');
+    const steps = document.querySelectorAll('.step');
+    
+    // Form sections
+    const serviceSection = document.getElementById('service-section');
+    const addonsSection = document.getElementById('addons-section');
+    const datetimeSection = document.getElementById('datetime-section');
+    const reviewSection = document.getElementById('review-section');
+    
+    // Navigation buttons
+    const toAddonsBtn = document.getElementById('to-addons-btn');
+    const backToServiceBtn = document.getElementById('back-to-service-btn');
+    const toDatetimeBtn = document.getElementById('to-datetime-btn');
+    const backToAddonsBtn = document.getElementById('back-to-addons-btn');
+    const toReviewBtn = document.getElementById('to-review-btn');
+    const backToDatetimeBtn = document.getElementById('back-to-datetime-btn');
+    
+    // Form elements
+    const mainServiceSelect = document.getElementById('main-service');
+    const subServicesContainer = document.getElementById('sub-services-container');
+    const subServicesList = document.getElementById('sub-services-list');
+    const dateInput = document.getElementById('appointment-date');
+    const timeSlotSelect = document.getElementById('{{ form.time_slot.id_for_label }}');
+    const loadingIndicator = document.getElementById('time-slot-loading');
+    const notesField = document.getElementById('{{ form.notes.id_for_label }}');
+    
+    // Review elements
+    const reviewService = document.getElementById('review-service');
+    const reviewDate = document.getElementById('review-date');
+    const reviewTime = document.getElementById('review-time');
+    const reviewAddons = document.getElementById('review-addons');
+    const reviewNotes = document.getElementById('review-notes');
+    const reviewTotal = document.getElementById('review-total');
+    
+    // Service and price tracking
+    let mainServicePrice = 0;
+    let subServicePrices = {};
+    let totalPrice = 0;
+    
+    // Update progress bar
+    function updateProgress(step) {
+        // Reset all steps
+        steps.forEach((s, index) => {
+            s.classList.remove('active', 'completed');
+            if (index < step) {
+                s.classList.add('completed');
+            } else if (index === step) {
+                s.classList.add('active');
+            }
+        });
+        
+        // Update progress bar
+        progressBar.style.width = `${(step + 1) * 25}%`;
+    }
+    
+    // Show the given section and hide others with animation
+    function showSection(section) {
+        // Hide all sections
+        [serviceSection, addonsSection, datetimeSection, reviewSection].forEach(s => {
+            s.classList.add('d-none');
+            s.style.opacity = '0';
+        });
+        
+        // Show the selected section with animation
+        section.classList.remove('d-none');
+        section.classList.add('animate-fade-in');
+        
+        // Set opacity after a small delay to trigger animation
+        setTimeout(() => {
+            section.style.opacity = '1';
+        }, 10);
+    }
+    
+    // Function to fetch sub-services for a main service
+    function fetchSubServices(mainServiceId) {
+        if (!mainServiceId) {
+            subServicesList.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">Please select a main service first</div></div>';
+            return;
+        }
+        
+        // Show loading state
+        subServicesList.innerHTML = `
+            <div class="col-12 text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading available add-ons...</p>
+            </div>
+        `;
+        
+        // Set main service price (for later calculation)
+        const selectedOption = mainServiceSelect.options[mainServiceSelect.selectedIndex];
+        const serviceName = selectedOption.text.split(' - ')[0];
+        mainServicePrice = parseFloat(selectedOption.text.split('$')[1]);
+        
+        fetch(`/get-sub-services/${mainServiceId}/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                subServicesList.innerHTML = '';
+                if (data.sub_services && data.sub_services.length > 0) {
+                    data.sub_services.forEach(service => {
+                        const servicePrice = parseFloat(service.price);
+                        subServicePrices[service.id] = servicePrice;
+                        
+                        const serviceHtml = `
+                            <div class="col-md-6 mb-3">
+                                <div class="card service-card" id="card-${service.id}" 
+                                     onclick="document.getElementById('sub-service-${service.id}').click()">
+                                    <div class="form-check mb-0">
+                                        <input type="checkbox" name="sub_services" value="${service.id}" 
+                                               class="form-check-input" id="sub-service-${service.id}"
+                                               data-price="${servicePrice}">
+                                        <label class="form-check-label w-100" for="sub-service-${service.id}">
+                                            <h6 class="card-title mb-1">${service.name}</h6>
+                                            <p class="price mb-0">$${servicePrice.toFixed(2)}</p>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        subServicesList.insertAdjacentHTML('beforeend', serviceHtml);
+                    });
+                    
+                    // Add event listener to checkboxes to toggle card selection
+                    document.querySelectorAll('input[name="sub_services"]').forEach(checkbox => {
+                        checkbox.addEventListener('change', function() {
+                            const cardId = 'card-' + this.value;
+                            const card = document.getElementById(cardId);
+                            if (this.checked) {
+                                card.classList.add('selected');
+                            } else {
+                                card.classList.remove('selected');
+                            }
+                            
+                            // Enable/disable next button based on selection
+                            const hasSelectedSubService = document.querySelectorAll('input[name="sub_services"]:checked').length > 0;
+                            toDatetimeBtn.disabled = !hasSelectedSubService;
+                            
+                            // Update total price when selections change
+                            updateTotalPrice();
+                        });
+                    });
+                    
+                } else {
+                    subServicesList.innerHTML = '<div class="col-12"><div class="alert alert-info">No add-on services available for this service.</div></div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching sub-services:', error);
+                subServicesList.innerHTML = '<div class="col-12"><div class="alert alert-danger">Error loading add-on services. Please try again.</div></div>';
+            });
+    }
+    
+    // Function to fetch available time slots
+    function fetchTimeSlots(date) {
+        loadingIndicator.classList.remove('d-none');
+        timeSlotSelect.disabled = true;
+        
+        while (timeSlotSelect.options.length > 1) {
+            timeSlotSelect.remove(1);
+        }
+        
+        fetch(`{% url 'get_time_slots' %}?date=${date}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.slots && data.slots.length > 0) {
+                    data.slots.forEach(slot => {
+                        const option = document.createElement('option');
+                        option.value = slot.id;
+                        option.textContent = slot.text;
+                        timeSlotSelect.appendChild(option);
+                    });
+                    timeSlotSelect.disabled = false;
+                    timeSlotSelect.options[0].text = 'Select a time slot';
+                    
+                    // If previously selected time slot is available, select it
+                    if (timeSlotSelect.dataset.previousValue) {
+                        const prevValue = timeSlotSelect.dataset.previousValue;
+                        for (let i = 0; i < timeSlotSelect.options.length; i++) {
+                            if (timeSlotSelect.options[i].value === prevValue) {
+                                timeSlotSelect.value = prevValue;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Enable/disable review button based on time slot selection
+                    checkDateTimeSelection();
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No time slots available for this date';
+                    timeSlotSelect.appendChild(option);
+                    toReviewBtn.disabled = true;
+                }
+                loadingIndicator.classList.add('d-none');
+            })
+            .catch(error => {
+                console.error('Error fetching time slots:', error);
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Error loading time slots';
+                timeSlotSelect.appendChild(option);
+                loadingIndicator.classList.add('d-none');
+                toReviewBtn.disabled = true;
+            });
+    }
+    
+    // Function to check if date and time are selected
+    function checkDateTimeSelection() {
+        const dateSelected = dateInput.value !== '';
+        const timeSelected = timeSlotSelect.value !== '';
+        toReviewBtn.disabled = !(dateSelected && timeSelected);
+    }
+    
+    // Function to update total price
+    function updateTotalPrice() {
+        totalPrice = mainServicePrice;
+        
+        // Add selected sub-services prices
+        document.querySelectorAll('input[name="sub_services"]:checked').forEach(checkbox => {
+            totalPrice += parseFloat(checkbox.dataset.price);
+        });
+        
+        // Update the review section
+        reviewTotal.textContent = `$${totalPrice.toFixed(2)}`;
+    }
+    
+    // Function to update review section
+    function updateReviewSection() {
+        // Service
+        const selectedService = mainServiceSelect.options[mainServiceSelect.selectedIndex].text;
+        reviewService.textContent = selectedService;
+        
+        // Date
+        const selectedDate = dateInput.value ? new Date(dateInput.value) : null;
+        if (selectedDate) {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            reviewDate.textContent = selectedDate.toLocaleDateString('en-US', options);
+        } else {
+            reviewDate.textContent = 'Not selected';
+        }
+        
+        // Time
+        const selectedTime = timeSlotSelect.value ? timeSlotSelect.options[timeSlotSelect.selectedIndex].text : 'Not selected';
+        reviewTime.textContent = selectedTime;
+        
+        // Add-ons
+        reviewAddons.innerHTML = '';
+        const selectedAddons = document.querySelectorAll('input[name="sub_services"]:checked');
+        if (selectedAddons.length > 0) {
+            selectedAddons.forEach(addon => {
+                const addonCard = document.getElementById(`card-${addon.value}`);
+                const addonName = addonCard.querySelector('.card-title').textContent;
+                const addonPrice = addonCard.querySelector('.price').textContent;
+                const li = document.createElement('li');
+                li.textContent = `${addonName} (${addonPrice})`;
+                reviewAddons.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.textContent = 'None selected';
+            reviewAddons.appendChild(li);
+        }
+        
+        // Notes
+        reviewNotes.textContent = notesField.value ? notesField.value : 'None';
+        
+        // Update total price
+        updateTotalPrice();
+    }
+    
+    // Listen for main service changes
+    mainServiceSelect.addEventListener('change', function() {
+        // Enable/disable next button based on selection
+        toAddonsBtn.disabled = !this.value;
+        
+        // If there's a selection, fetch sub-services
+        if (this.value) {
+            fetchSubServices(this.value);
+            
+            // Submit the form to update the sub-services queryset
+            const formData = new FormData(form);
+            formData.append('update_sub_services', 'true');
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('Error updating sub-services');
+                }
+            });
+        }
+    });
+    
+    // Listen for date changes
+    dateInput.addEventListener('change', function() {
+        if (this.value) {
+            fetchTimeSlots(this.value);
+        } else {
+            timeSlotSelect.disabled = true;
+            while (timeSlotSelect.options.length > 1) {
+                timeSlotSelect.remove(1);
+            }
+            timeSlotSelect.options[0].text = 'Select a date first';
+            toReviewBtn.disabled = true;
+        }
+    });
+    
+    // Listen for time slot changes
+    timeSlotSelect.addEventListener('change', function() {
+        // Store the selected value
+        this.dataset.previousValue = this.value;
+        checkDateTimeSelection();
+    });
+    
+    // Navigation event listeners
+    toAddonsBtn.addEventListener('click', function() {
+        showSection(addonsSection);
+        updateProgress(1);
+    });
+    
+    backToServiceBtn.addEventListener('click', function() {
+        showSection(serviceSection);
+        updateProgress(0);
+    });
+    
+    toDatetimeBtn.addEventListener('click', function() {
+        showSection(datetimeSection);
+        updateProgress(2);
+    });
+    
+    backToAddonsBtn.addEventListener('click', function() {
+        showSection(addonsSection);
+        updateProgress(1);
+    });
+    
+    toReviewBtn.addEventListener('click', function() {
+        updateReviewSection();
+        showSection(reviewSection);
+        updateProgress(3);
+    });
+    
+    backToDatetimeBtn.addEventListener('click', function() {
+        showSection(datetimeSection);
+        updateProgress(2);
+    });
+    
+    // If main service is already selected, enable next button
+    if (mainServiceSelect.value) {
+        toAddonsBtn.disabled = false;
+        fetchSubServices(mainServiceSelect.value);
+    }
+    
+    // If date is already selected, fetch time slots
+    if (dateInput.value) {
+        fetchTimeSlots(dateInput.value);
+    }
+    
+    // Form submission validation
+    form.addEventListener('submit', function(event) {
+        const selectedSubServices = document.querySelectorAll('input[name="sub_services"]:checked');
+        
+        if (!mainServiceSelect.value) {
+            event.preventDefault();
+            showSection(serviceSection);
+            updateProgress(0);
+            alert('Please select a main service');
+            return false;
+        }
+        
+        if (selectedSubServices.length === 0) {
+            event.preventDefault();
+            showSection(addonsSection);
+            updateProgress(1);
+            alert('Please select at least one add-on service');
+            return false;
+        }
+        
+        if (!dateInput.value) {
+            event.preventDefault();
+            showSection(datetimeSection);
+            updateProgress(2);
+            alert('Please select a date');
+            return false;
+        }
+        
+        if (!timeSlotSelect.value) {
+            event.preventDefault();
+            showSection(datetimeSection);
+            updateProgress(2);
+            alert('Please select a time slot');
+            return false;
+        }
+        
+        return true;
+    });
+    
+    // Initialize
+    updateProgress(0);
+});
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+{% comment %} {% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block content %}
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
@@ -19,20 +803,40 @@
                         </div>
                         {% endif %}
 
-                        <!-- Services Selection -->
+                        <!-- Main Service Selection -->
                         <div class="mb-4">
-                            <label class="form-label">{{ form.services.label }}</label>
-                            <div class="row">
-                                {% for service in form.services %}
+                            <label class="form-label">{{ form.main_service.label }}</label>
+                            <select name="main_service" id="main-service" class="form-control">
+                                <option value="">Select a main service</option>
+                                {% for service in form.main_service.field.queryset %}
+                                <option value="{{ service.id }}" {% if form.main_service.value|stringformat:"s" == service.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ service.name }} - ${{ service.price }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.main_service.errors %}
+                            <div class="text-danger">
+                                {{ form.main_service.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Sub-Services Selection -->
+                        <div class="mb-4" id="sub-services-container">
+                            <label class="form-label">{{ form.sub_services.label }}</label>
+                            <div class="row" id="sub-services-list">
+                                {% for service in form.sub_services.field.queryset %}
                                 <div class="col-md-6 mb-2">
                                     <div class="card">
                                         <div class="card-body">
                                             <div class="form-check">
-                                                {{ service.tag }}
-                                                <label class="form-check-label" for="{{ service.id_for_label }}">
-                                                    {{ service.choice_label }}
+                                                <input type="checkbox" name="sub_services" value="{{ service.id }}" 
+                                                       class="form-check-input" id="sub-service-{{ service.id }}"
+                                                       {% if service.id in form.sub_services.value %}checked{% endif %}>
+                                                <label class="form-check-label" for="sub-service-{{ service.id }}">
+                                                    {{ service.name }}
                                                     <br>
-                                                    <small class="text-muted">${{ service.choice_value.price }}</small>
+                                                    <small class="text-muted">${{ service.price }}</small>
                                                 </label>
                                             </div>
                                         </div>
@@ -40,9 +844,9 @@
                                 </div>
                                 {% endfor %}
                             </div>
-                            {% if form.services.errors %}
+                            {% if form.sub_services.errors %}
                             <div class="text-danger">
-                                {{ form.services.errors }}
+                                {{ form.sub_services.errors }}
                             </div>
                             {% endif %}
                         </div>
@@ -110,6 +914,9 @@
     width: 100%;
     cursor: pointer;
 }
+#sub-services-container {
+    display: none;
+}
 </style>
 
 <script>
@@ -117,25 +924,103 @@ document.addEventListener('DOMContentLoaded', function() {
     const dateInput = document.getElementById('appointment-date');
     const timeSlotSelect = document.getElementById('{{ form.time_slot.id_for_label }}');
     const loadingIndicator = document.getElementById('time-slot-loading');
+    const mainServiceSelect = document.getElementById('main-service');
+    const subServicesContainer = document.getElementById('sub-services-container');
+    const subServicesList = document.getElementById('sub-services-list');
     const form = document.querySelector('form');
     
+    // Function to fetch sub-services for a main service
+    function fetchSubServices(mainServiceId) {
+        if (!mainServiceId) {
+            subServicesContainer.style.display = 'none';
+            return;
+        }
+
+        // Show loading state
+        subServicesList.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        subServicesContainer.style.display = 'block';
+
+        fetch(`/get-sub-services/${mainServiceId}/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                subServicesList.innerHTML = '';
+                if (data.sub_services && data.sub_services.length > 0) {
+                    data.sub_services.forEach(service => {
+                        const serviceHtml = `
+                            <div class="col-md-6 mb-2">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="sub_services" value="${service.id}" 
+                                                   class="form-check-input" id="sub-service-${service.id}">
+                                            <label class="form-check-label" for="sub-service-${service.id}">
+                                                ${service.name}
+                                                <br>
+                                                <small class="text-muted">$${service.price}</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        subServicesList.insertAdjacentHTML('beforeend', serviceHtml);
+                    });
+                    subServicesContainer.style.display = 'block';
+                } else {
+                    subServicesList.innerHTML = '<div class="col-12"><div class="alert alert-info">No sub-services available for this service.</div></div>';
+                    subServicesContainer.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching sub-services:', error);
+                subServicesList.innerHTML = '<div class="col-12"><div class="alert alert-danger">Error loading sub-services. Please try again.</div></div>';
+                subServicesContainer.style.display = 'block';
+            });
+    }
+
+    // Listen for main service changes
+    mainServiceSelect.addEventListener('change', function() {
+        // Clear any previously selected sub-services
+        const existingSubServices = document.querySelectorAll('input[name="sub_services"]:checked');
+        existingSubServices.forEach(checkbox => checkbox.checked = false);
+        
+        fetchSubServices(this.value);
+        
+        // Submit the form to update the sub-services queryset
+        const formData = new FormData(form);
+        formData.append('update_sub_services', 'true');
+        
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        }).then(response => {
+            if (!response.ok) {
+                console.error('Error updating sub-services');
+            }
+        });
+    });
+
     // Function to fetch available time slots
     function fetchTimeSlots(date) {
-        // Show loading indicator
         loadingIndicator.classList.remove('d-none');
         timeSlotSelect.disabled = true;
         
-        // Clear current options except the default one
         while (timeSlotSelect.options.length > 1) {
             timeSlotSelect.remove(1);
         }
         
-        // Fetch available slots for the selected date
         fetch(`{% url 'get_time_slots' %}?date=${date}`)
             .then(response => response.json())
             .then(data => {
                 if (data.slots && data.slots.length > 0) {
-                    // Add options for each available slot
                     data.slots.forEach(slot => {
                         const option = document.createElement('option');
                         option.value = slot.id;
@@ -145,23 +1030,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     timeSlotSelect.disabled = false;
                     timeSlotSelect.options[0].text = 'Select a time slot';
                 } else {
-                    // No slots available
                     const option = document.createElement('option');
                     option.value = '';
                     option.textContent = 'No time slots available for this date';
                     timeSlotSelect.appendChild(option);
                 }
-                // Hide loading indicator
                 loadingIndicator.classList.add('d-none');
             })
             .catch(error => {
                 console.error('Error fetching time slots:', error);
-                // Add an error option
                 const option = document.createElement('option');
                 option.value = '';
                 option.textContent = 'Error loading time slots';
                 timeSlotSelect.appendChild(option);
-                // Hide loading indicator
                 loadingIndicator.classList.add('d-none');
             });
     }
@@ -171,7 +1052,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (this.value) {
             fetchTimeSlots(this.value);
         } else {
-            // Reset time slot select if no date is selected
             timeSlotSelect.disabled = true;
             while (timeSlotSelect.options.length > 1) {
                 timeSlotSelect.remove(1);
@@ -180,20 +1060,46 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // If date is already selected (e.g., in edit mode), fetch time slots
+    // If date is already selected, fetch time slots
     if (dateInput.value) {
         fetchTimeSlots(dateInput.value);
     }
+
+    // If main service is already selected, fetch its sub-services
+    if (mainServiceSelect.value) {
+        fetchSubServices(mainServiceSelect.value);
+    }
     
-    // Ensure the form is valid before submission
+    // Form validation
     form.addEventListener('submit', function(event) {
-        if (timeSlotSelect.value === '') {
+        const selectedSubServices = document.querySelectorAll('input[name="sub_services"]:checked');
+        
+        if (!mainServiceSelect.value) {
+            event.preventDefault();
+            alert('Please select a main service');
+            return false;
+        }
+        
+        if (selectedSubServices.length === 0) {
+            event.preventDefault();
+            alert('Please select at least one sub-service');
+            return false;
+        }
+        
+        if (!dateInput.value) {
+            event.preventDefault();
+            alert('Please select a date');
+            return false;
+        }
+        
+        if (!timeSlotSelect.value) {
             event.preventDefault();
             alert('Please select a time slot');
             return false;
         }
+        
         return true;
     });
 });
 </script>
-{% endblock %}
+{% endblock %} {% endcomment %}

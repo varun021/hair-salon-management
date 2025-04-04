@@ -2,7 +2,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import path
 from . import views
 from .views import user_logout, client_dashboard, book_appointment, cancel_appointment, reschedule_appointment, \
-    update_profile, change_password, complete_appointment, get_available_time_slots
+    update_profile, change_password, complete_appointment, get_available_time_slots, get_sub_services
 
 urlpatterns = [
     path('', views.landing_page, name='landing_page'),
@@ -16,11 +16,13 @@ urlpatterns = [
     path('client-dashboard/', client_dashboard, name='client_dashboard'),
     path('book-appointment/', book_appointment, name='book_appointment'),
     path('get-time-slots/', get_available_time_slots, name='get_time_slots'),
+    path('get-sub-services/<int:main_service_id>/', get_sub_services, name='get_sub_services'),
     path('complete-appointment/<int:appointment_id>/', complete_appointment, name='complete_appointment'),
     path('cancel-appointment/<int:appointment_id>/', cancel_appointment, name='cancel_appointment'),
     path('reschedule-appointment/<int:appointment_id>/', reschedule_appointment, name='reschedule_appointment'),
     path('logout/', views.user_logout, name='logout'),
     path('employee-dashboard/', views.employee_dashboard, name='employee_dashboard'),
+    path('services/', views.manage_services, name='manage_services'),
     path('services/add/', views.add_service, name='add_service'),
     path('services/edit/<int:service_id>/', views.edit_service, name='edit_service'),
     path('services/delete/<int:service_id>/', views.delete_service, name='delete_service'),

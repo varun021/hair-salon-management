@@ -2,321 +2,822 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Welcome Section -->
-    <div class="row mb-4">
-        <div class="col-lg-8">
-            <div class="card bg-primary text-white">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <h2 class="mb-1">Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
-                        <p class="mb-0">Manage your appointments and services</p>
-                    </div>
-                    <div class="text-end">
-                        <h4 class="mb-1">Loyalty Points</h4>
-                        <h3 class="mb-0">{{ loyalty_points.points }} <i class="fas fa-star text-warning"></i></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Quick Actions</h5>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'book_appointment' %}" class="btn btn-primary">
-                            <i class="fas fa-calendar-plus me-2"></i>Book New Appointment
-                        </a>
-                        <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-user-edit me-2"></i>Update Profile
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="dashboard-container">
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">
+                <i class="fas fa-home"></i> Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="appointments-tab" data-bs-toggle="tab" data-bs-target="#appointments" type="button" role="tab" aria-controls="appointments" aria-selected="false">
+                <i class="fas fa-calendar-alt"></i> Appointments
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
+                <i class="fas fa-history"></i> History
+            </button>
+        </li>
+        <li class="nav-item" id="notifications-tab-container" role="presentation">
+            <button class="nav-link position-relative" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notifications" type="button" role="tab" aria-controls="notifications" aria-selected="false">
+                <i class="fas fa-bell"></i> Notifications
+                {% if unread_notifications %}
+                <span class="notification-badge">{{ unread_notifications|length }}</span>
+                {% endif %}
+            </button>
+        </li>
+    </ul>
 
-    <!-- Notifications -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-bell me-2"></i>Notifications
-                        {% if unread_notifications %}
-                            <span class="badge bg-danger">{{ unread_notifications.count }}</span>
-                        {% endif %}
-                    </h5>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="markAllAsRead()">
-                        Mark all as read
-                    </button>
+    <!-- Tab Content -->
+    <div class="tab-content" id="dashboardTabsContent">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+            <div class="overview-grid">
+                <!-- Loyalty Card -->
+                <div class="card loyalty-card">
+                    <div class="card-body">
+                        <h5 class="card-title gradient-text">Loyalty Points</h5>
+                        <div class="points-circle">
+                            <span class="points-value">{{ loyalty_points.points }}</span>
+                        </div>
+                        <p class="text-muted">Total Points Earned</p>
+                    </div>
                 </div>
-                <div class="card-body notification-list" style="max-height: 300px; overflow-y: auto;">
-                    {% if notifications %}
-                        {% for notification in notifications %}
-                            <div class="notification-item p-3 {% if not notification.is_read %}unread{% endif %}"
-                                 data-notification-id="{{ notification.id }}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-1">{{ notification.title }}</h6>
-                                        <p class="mb-1">{{ notification.message }}</p>
-                                        <small class="text-muted">
-                                            {{ notification.created_at|timesince }} ago
-                                        </small>
-                                    </div>
-                                    {% if not notification.is_read %}
-                                        <button class="btn btn-sm btn-link mark-read-btn">
-                                            Mark as read
-                                        </button>
-                                    {% endif %}
+
+                <!-- Next Appointment Card -->
+                <div class="card upcoming-card">
+                    <div class="card-body">
+                        <h5 class="card-title gradient-text">Next Appointment</h5>
+                        {% if upcoming_appointments %}
+                            {% with next_appointment=upcoming_appointments.0 %}
+                            <div class="next-appointment">
+                                <div class="date-badge">
+                                    <span class="month">{{ next_appointment.date|date:"M" }}</span>
+                                    <span class="day">{{ next_appointment.date|date:"d" }}</span>
+                                </div>
+                                <div class="appointment-details">
+                                    <p class="time"><i class="far fa-clock"></i> {{ next_appointment.time_slot }}</p>
+                                    <p class="status">
+                                        <span class="status-dot status-{{ next_appointment.status|lower }}"></span>
+                                        {{ next_appointment.status }}
+                                    </p>
                                 </div>
                             </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-muted text-center mb-0">No notifications</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Upcoming Appointments -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Upcoming Appointments</h5>
-                </div>
-                <div class="card-body">
-                    {% if upcoming_appointments %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Service(s)</th>
-                                        <th>Date & Time</th>
-                                        <th>Status</th>
-                                        <th>Total</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for appointment in upcoming_appointments %}
-                                    <tr>
-                                        <td>
-                                            {% for service in appointment.appointment_services.all %}
-                                                <div>{{ service.service.name }}</div>
-                                            {% endfor %}
-                                        </td>
-                                        <td>
-                                            <div>{{ appointment.date|date:"F d, Y" }}</div>
-                                            <small class="text-muted">{{ appointment.time|time:"g:i A" }}</small>
-                                        </td>
-                                        <td>
-                                            {% if appointment.status == 'Confirmed' %}
-                                                <span class="badge bg-success">{{ appointment.status }}</span>
-                                            {% elif appointment.status == 'Pending' %}
-                                                <span class="badge bg-warning">{{ appointment.status }}</span>
-                                            {% elif appointment.status == 'Completed' %}
-                                                <span class="badge bg-info">{{ appointment.status }}</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">{{ appointment.status }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
-                                        <td>
-                                            {% if appointment.status == "Pending" or appointment.status == "Confirmed" %}
-                                                <div class="btn-group">
-                                                    <a href="{% url 'reschedule_appointment' appointment.id %}" 
-                                                       class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-clock me-1"></i>Reschedule
-                                                    </a>
-                                                    <a href="{% url 'cancel_appointment' appointment.id %}" 
-                                                       class="btn btn-sm btn-outline-danger"
-                                                       onclick="return confirm('Are you sure you want to cancel this appointment?')">
-                                                        <i class="fas fa-times me-1"></i>Cancel
-                                                    </a>
-                                                </div>
-                                            {% endif %}
-                                            {% if appointment.status == "Completed" and not appointment.payment %}
-                                                <a href="{% url 'process_payment' appointment.id %}" 
-                                                   class="btn btn-sm btn-success">
-                                                    <i class="fas fa-credit-card me-1"></i>Pay Now
-                                                </a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                            <p class="mb-0">No upcoming appointments</p>
-                            <a href="{% url 'book_appointment' %}" class="btn btn-primary mt-3">
-                                Book an Appointment
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Past Appointments -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-history me-2"></i>Appointment History
-                    </h5>
-                    <button class="btn btn-sm btn-outline-primary" type="button" 
-                            data-bs-toggle="collapse" data-bs-target="#pastAppointments">
-                        Toggle History
-                    </button>
-                </div>
-                <div class="collapse show" id="pastAppointments">
-                    <div class="card-body">
-                        {% if past_appointments %}
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Service(s)</th>
-                                            <th>Date & Time</th>
-                                            <th>Status</th>
-                                            <th>Total</th>
-                                            <th>Payment Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for appointment in past_appointments %}
-                                        <tr>
-                                            <td>
-                                                {% for service in appointment.appointment_services.all %}
-                                                    <div>{{ service.service.name }}</div>
-                                                    <small class="text-muted">
-                                                        Quantity: {{ service.quantity }}
-                                                    </small>
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                <div>{{ appointment.date|date:"F d, Y" }}</div>
-                                                <small class="text-muted">
-                                                    {{ appointment.time|time:"g:i A" }}
-                                                </small>
-                                            </td>
-                                            <td>
-                                                {% if appointment.status == 'Completed' %}
-                                                    <span class="badge bg-info">Completed</span>
-                                                {% elif appointment.status == 'Paid' %}
-                                                    <span class="badge bg-success">Paid</span>
-                                                {% elif appointment.status == 'Cancelled' %}
-                                                    <span class="badge bg-danger">Cancelled</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">{{ appointment.status }}</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>${{ appointment.calculate_grand_total|floatformat:2 }}</td>
-                                            <td>
-                                                {% if appointment.payment %}
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check-circle me-1"></i>Paid
-                                                    </span>
-                                                {% elif appointment.status == 'Completed' %}
-                                                    <span class="badge bg-warning">
-                                                        <i class="fas fa-clock me-1"></i>Pending
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">N/A</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if appointment.status == 'Completed' and not appointment.payment %}
-                                                    <a href="{% url 'process_payment' appointment.id %}" 
-                                                       class="btn btn-primary btn-sm">
-                                                        <i class="fas fa-credit-card me-1"></i>Pay Now
-                                                    </a>
-                                                {% elif appointment.payment %}
-                                                    <a href="{% url 'payment_confirmation' appointment.payment.id %}" 
-                                                       class="btn btn-outline-secondary btn-sm">
-                                                        <i class="fas fa-receipt me-1"></i>View Receipt
-                                                    </a>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
+                            {% endwith %}
                         {% else %}
-                            <div class="text-center py-4">
-                                <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                                <p class="text-muted mb-0">No appointment history available</p>
+                            <div class="empty-state">
+                                <i class="far fa-calendar-alt"></i>
+                                <p>No upcoming appointments</p>
                             </div>
                         {% endif %}
                     </div>
+                    <div class="card-footer">
+                        <a href="{% url 'book_appointment' %}" class="btn btn-gradient">Book New Appointment</a>
+                    </div>
                 </div>
+
+                <!-- Quick Stats Card -->
+                <div class="card stats-card">
+                    <div class="card-body">
+                        <h5 class="card-title gradient-text">Quick Stats</h5>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-value">{{ upcoming_appointments|length }}</span>
+                                <span class="stat-label">Upcoming</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value">{{ past_appointments|length }}</span>
+                                <span class="stat-label">Completed</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value">{{ unread_notifications|length }}</span>
+                                <span class="stat-label">Unread</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointments Tab -->
+        <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
+            <div class="tab-header">
+                <h4 class="gradient-text">Upcoming Appointments</h4>
+                <a href="{% url 'book_appointment' %}" class="btn btn-gradient">Book New Appointment</a>
+            </div>
+
+            <div class="appointments-container">
+                {% if upcoming_appointments %}
+                    {% for appointment in upcoming_appointments %}
+                        <div class="appointment-card">
+                            <div class="appointment-header">
+                                <div class="appointment-date">
+                                    <span class="day">{{ appointment.date|date:"d" }}</span>
+                                    <span class="month">{{ appointment.date|date:"M" }}</span>
+                                </div>
+                                <div class="appointment-time">
+                                    <i class="far fa-clock"></i> {{ appointment.time_slot }}
+                                </div>
+                                <div class="appointment-status">
+                                    <span class="status-badge status-{{ appointment.status|lower }}">{{ appointment.status }}</span>
+                                </div>
+                            </div>
+                            <div class="appointment-body">
+                                <div class="services-container">
+                                    <h6 class="services-title"><i class="fas fa-concierge-bell"></i> Services</h6>
+                                    <ul class="services-list">
+                                        {% for app_service in appointment.appointment_services.all %}
+                                            {% with service=app_service.service %}
+                                                {% if service.service_type == 'MAIN' %}
+                                                    <li class="main-service">
+                                                        <span class="service-name">{{ service.name }}</span>
+                                                        <span class="service-price">${{ service.price }}</span>
+                                                        
+                                                        {% if appointment.appointment_services.all|length > 1 %}
+                                                            <ul class="sub-services-list">
+                                                                {% for sub_app_service in appointment.appointment_services.all %}
+                                                                    {% with sub_service=sub_app_service.service %}
+                                                                        {% if sub_service.service_type == 'SUB' and sub_service.parent_service == service %}
+                                                                            <li>
+                                                                                <span class="service-name">{{ sub_service.name }}</span>
+                                                                                <span class="service-price">${{ sub_service.price }}</span>
+                                                                            </li>
+                                                                        {% endif %}
+                                                                    {% endwith %}
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% endif %}
+                                                    </li>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="appointment-footer">
+                                {% if appointment.status == 'Pending' or appointment.status == 'Confirmed' %}
+                                    <a href="{% url 'reschedule_appointment' appointment.id %}" class="btn btn-outline">
+                                        <i class="fas fa-calendar-alt"></i> Reschedule
+                                    </a>
+                                    <a href="{% url 'cancel_appointment' appointment.id %}" class="btn btn-outline-danger" 
+                                       onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="far fa-calendar-alt"></i>
+                        <p>No upcoming appointments</p>
+                        <a href="{% url 'book_appointment' %}" class="btn btn-gradient">Book Your First Appointment</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+            <div class="tab-header">
+                <h4 class="gradient-text">Appointment History</h4>
+            </div>
+
+            <div class="appointments-container">
+                {% if past_appointments %}
+                    {% for appointment in past_appointments %}
+                        <div class="appointment-card history-card">
+                            <div class="appointment-header">
+                                <div class="appointment-date">
+                                    <span class="day">{{ appointment.date|date:"d" }}</span>
+                                    <span class="month">{{ appointment.date|date:"M" }}</span>
+                                </div>
+                                <div class="appointment-time">
+                                    <i class="far fa-clock"></i> {{ appointment.time_slot }}
+                                </div>
+                                <div class="appointment-status">
+                                    <span class="status-badge status-{{ appointment.status|lower }}">{{ appointment.status }}</span>
+                                </div>
+                            </div>
+                            <div class="appointment-body">
+                                <div class="services-container">
+                                    <h6 class="services-title"><i class="fas fa-concierge-bell"></i> Services</h6>
+                                    <ul class="services-list">
+                                        {% for app_service in appointment.appointment_services.all %}
+                                            {% with service=app_service.service %}
+                                                {% if service.service_type == 'MAIN' %}
+                                                    <li class="main-service">
+                                                        <span class="service-name">{{ service.name }}</span>
+                                                        <span class="service-price">${{ service.price }}</span>
+                                                        
+                                                        {% if appointment.appointment_services.all|length > 1 %}
+                                                            <ul class="sub-services-list">
+                                                                {% for sub_app_service in appointment.appointment_services.all %}
+                                                                    {% with sub_service=sub_app_service.service %}
+                                                                        {% if sub_service.service_type == 'SUB' and sub_service.parent_service == service %}
+                                                                            <li>
+                                                                                <span class="service-name">{{ sub_service.name }}</span>
+                                                                                <span class="service-price">${{ sub_service.price }}</span>
+                                                                            </li>
+                                                                        {% endif %}
+                                                                    {% endwith %}
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% endif %}
+                                                    </li>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                
+                                {% if appointment.payment %}
+                                    <div class="payment-info">
+                                        <h6 class="payment-title"><i class="fas fa-credit-card"></i> Payment</h6>
+                                        <div class="payment-details">
+                                            <span class="payment-status status-badge status-paid">Paid</span>
+                                            <span class="payment-amount">${{ appointment.payment.total_amount }}</span>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="appointment-footer">
+                                {% if appointment.status == 'Completed' and not appointment.payment %}
+                                    <a href="{% url 'process_payment' appointment.id %}" class="btn btn-gradient">
+                                        <i class="fas fa-credit-card"></i> Process Payment
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="far fa-file-alt"></i>
+                        <p>No appointment history yet</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notifications Tab -->
+        <div class="tab-pane fade" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+            <div class="tab-header">
+                <h4 class="gradient-text">Notifications</h4>
+                {% if unread_notifications %}
+                    <button class="btn btn-outline" onclick="markAllNotificationsRead()">
+                        <i class="fas fa-check-double"></i> Mark All Read
+                    </button>
+                {% endif %}
+            </div>
+
+            <div class="notifications-container">
+                {% if notifications %}
+                    {% for notification in notifications %}
+                        <div class="notification-card {% if not notification.is_read %}unread{% endif %}" id="notification-{{ notification.id }}">
+                            <div class="notification-header">
+                                <h6 class="notification-title">{{ notification.title }}</h6>
+                                <span class="notification-time">{{ notification.created_at|timesince }} ago</span>
+                            </div>
+                            <div class="notification-body">
+                                <p>{{ notification.message }}</p>
+                            </div>
+                            {% if not notification.is_read %}
+                                <div class="notification-footer">
+                                    <button class="btn btn-sm btn-outline" onclick="markNotificationRead({{ notification.id }})">
+                                        <i class="fas fa-check"></i> Mark as Read
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="far fa-bell"></i>
+                        <p>No notifications</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <style>
-.notification-item {
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.3s;
+/* Base Styles */
+:root {
+    --primary-gradient: linear-gradient(45deg, #6a11cb, #2575fc);
+    --secondary-gradient: linear-gradient(45deg, #f857a6, #ff5858);
+    --accent-gradient: linear-gradient(45deg, #00c6fb, #005bea);
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --danger-color: #dc3545;
+    --light-bg: #f8f9fe;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --border-radius: 12px;
 }
-.notification-item:last-child {
-    border-bottom: none;
+
+body {
+    background-color: var(--light-bg);
+    font-family: 'Poppins', sans-serif;
 }
-.notification-item.unread {
+
+.dashboard-container {
+    padding: 30px 0;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+/* Gradient Text */
+.gradient-text {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+/* Tabs Styling */
+.nav-tabs {
+    border: none;
+    margin-bottom: 25px;
+    display: flex;
+    background-color: white;
+    border-radius: var(--border-radius);
+    padding: 5px;
+    box-shadow: var(--card-shadow);
+}
+
+.nav-tabs .nav-item {
+    margin: 0 5px;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 12px 20px;
+    color: #6c757d;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    background: var(--primary-gradient);
+    color: white;
+    box-shadow: 0 4px 15px rgba(106, 17, 203, 0.3);
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
     background-color: #f8f9fa;
 }
-.notification-item:hover {
-    background-color: #f1f3f5;
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--secondary-gradient);
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.badge {
-    padding: 0.5em 0.8em;
+
+/* Tab Content */
+.tab-content {
+    background-color: transparent;
+}
+
+.tab-pane {
+    padding: 10px;
+}
+
+.tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Overview Tab Grid */
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* Cards Styling */
+.card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 25px;
+}
+
+.card-footer {
+    background-color: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 15px 25px;
+}
+
+/* Loyalty Card */
+.loyalty-card {
+    text-align: center;
+}
+
+.points-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px auto;
+    box-shadow: 0 10px 20px rgba(0, 198, 251, 0.2);
+}
+
+.points-value {
+    font-size: 3rem;
+    font-weight: 700;
+    color: white;
+}
+
+/* Buttons */
+.btn-gradient {
+    background: var(--primary-gradient);
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(106, 17, 203, 0.3);
+}
+
+.btn-gradient:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(106, 17, 203, 0.4);
+    color: white;
+}
+
+.btn-outline {
+    border: 1px solid #ddd;
+    color: #6c757d;
+    background-color: white;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+    border-color: #6a11cb;
+    color: #6a11cb;
+    transform: translateY(-2px);
+}
+
+.btn-outline-danger {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+    background-color: white;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Appointments Styling */
+.appointments-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.appointment-card {
+    background: white;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.appointment-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.appointment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.appointment-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    border-radius: 8px;
+    padding: 5px 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.appointment-date .day {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.appointment-date .month {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #6c757d;
+}
+
+.appointment-time {
+    font-weight: 500;
+}
+
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: white;
+}
+
+.status-pending {
+    background-color: var(--warning-color);
+}
+
+.status-confirmed {
+    background-color: var(--info-color);
+}
+
+.status-completed {
+    background-color: var(--success-color);
+}
+
+.status-cancelled {
+    background-color: var(--danger-color);
+}
+
+.status-paid {
+    background-color: var(--success-color);
+}
+
+.appointment-body {
+    padding: 20px;
+}
+
+.services-title, .payment-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #6c757d;
+}
+
+.services-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.service-name {
+    flex: 1;
+}
+
+.service-price {
+    font-weight: 500;
+}
+
+.main-service {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sub-services-list {
+    list-style: none;
+    padding-left: 20px;
+    margin-top: 8px;
+}
+
+.sub-services-list li {
+    display: flex;
+    justify-content: space-between;
+    color: #6c757d;
+    font-size: 0.9rem;
+    padding: 4px 0;
+}
+
+.payment-info {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.payment-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.payment-amount {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.appointment-footer {
+    padding: 15px 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Empty State Styling */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: #dee2e6;
+    margin-bottom: 15px;
+}
+
+.empty-state p {
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+
+/* Notifications Styling */
+.notifications-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.notification-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+}
+
+.notification-card.unread {
+    border-left: 4px solid #6a11cb;
+    background-color: #f8f9fe;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.notification-title {
+    margin: 0;
+    font-weight: 600;
+}
+
+.notification-time {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.notification-body {
+    margin-bottom: 15px;
+}
+
+.notification-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .overview-grid,
+    .appointments-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .nav-tabs .nav-link {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .tab-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .tab-header h4 {
+        margin-bottom: 10px;
+    }
 }
 </style>
 
 <script>
-function markAllAsRead() {
-    fetch('{% url "mark_all_notifications_read" %}', {
+function markNotificationRead(notificationId) {
+    fetch(`/notifications/${notificationId}/mark-read/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
-        },
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            const notification = document.getElementById(`notification-${notificationId}`);
+            notification.classList.remove('unread');
+            const markReadBtn = notification.querySelector('.notification-footer');
+            if (markReadBtn) markReadBtn.remove();
+            
+            // Update notification count
+            updateNotificationCount();
         }
     });
 }
 
-document.querySelectorAll('.mark-read-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        const notificationId = this.closest('.notification-item').dataset.notificationId;
-        fetch(`/notifications/${notificationId}/mark-read/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                this.closest('.notification-item').classList.remove('unread');
-                this.remove();
-            }
-        });
+function markAllNotificationsRead() {
+    fetch('/notifications/mark-all-read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.querySelectorAll('.notification-card.unread').forEach(item => {
+                item.classList.remove('unread');
+                const markReadBtn = item.querySelector('.notification-footer');
+                if (markReadBtn) markReadBtn.remove();
+            });
+            
+            // Update notification count
+            updateNotificationCount();
+        }
     });
-});
+}
+
+function updateNotificationCount() {
+    const unreadCount = document.querySelectorAll('.notification-card.unread').length;
+    const badge = document.querySelector('.notification-badge');
+    
+    if (unreadCount > 0) {
+        if (badge) {
+            badge.textContent = unreadCount;
+        } else {
+            const newBadge = document.createElement('span');
+            newBadge.className = 'notification-badge';
+            newBadge.textContent = unreadCount;
+            document.querySelector('#notifications-tab').appendChild(newBadge);
+        }
+    } else if (badge) {
+        badge.remove();
+    }
+}
 </script>
 {% endblock %}

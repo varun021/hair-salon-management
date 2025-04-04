@@ -24,6 +24,11 @@ class User(AbstractUser):
 
 
 class Service(models.Model):
+    SERVICE_TYPES = (
+        ('MAIN', 'Main Service'),
+        ('SUB', 'Sub Service'),
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -32,12 +37,28 @@ class Service(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
+    
+    # New fields for parent-child relationship
+    service_type = models.CharField(max_length=4, choices=SERVICE_TYPES, default='MAIN')
+    parent_service = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_services')
 
     def __str__(self):
+        if self.service_type == 'SUB' and self.parent_service:
+            return f"{self.parent_service.name} - {self.name} - ${self.price}"
         return f"{self.name} - ${self.price}"
 
     class Meta:
-        ordering = ['name']
+        ordering = ['service_type', 'name']
+
+    @property
+    def is_main_service(self):
+        return self.service_type == 'MAIN'
+
+    @property
+    def get_all_sub_services(self):
+        if self.is_main_service:
+            return self.sub_services.filter(is_active=True)
+        return None
 
 
 class Payment(models.Model):

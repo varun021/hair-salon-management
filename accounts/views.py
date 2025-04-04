@@ -145,6 +145,11 @@ def get_available_time_slots(request):
 def book_appointment(request):
     """Allows users to book an appointment"""
     if request.method == "POST":
+        # Check if this is a request to update sub-services
+        if request.POST.get('update_sub_services'):
+            form = AppointmentForm(request.POST)
+            return JsonResponse({'success': True})
+            
         # Get the selected date and time_slot_id from POST data
         selected_date = request.POST.get('date')
         time_slot_id = request.POST.get('time_slot')
@@ -169,14 +174,25 @@ def book_appointment(request):
             appointment.client = request.user
             appointment.save()
             
-            # Save the selected services
-            services = form.cleaned_data['services']
-            for service in services:
+            # Get main service and sub-services
+            main_service = form.cleaned_data['main_service']
+            sub_services = form.cleaned_data['sub_services']
+            
+            # Create AppointmentService for main service
+            AppointmentService.objects.create(
+                appointment=appointment,
+                service=main_service,
+                price=main_service.price,
+                quantity=1
+            )
+            
+            # Create AppointmentService for each sub-service
+            for sub_service in sub_services:
                 AppointmentService.objects.create(
                     appointment=appointment,
-                    service=service,
-                    price=service.price,
-                    quantity=1  # Default quantity
+                    service=sub_service,
+                    price=sub_service.price,
+                    quantity=1
                 )
             
             # Get time slot text for notification
@@ -360,7 +376,7 @@ def employee_dashboard(request):
     appointment_counts = {
         'pending': Appointment.objects.filter(status='Pending').count(),
         'confirmed': Appointment.objects.filter(status='Confirmed').count(),
-        'completed': Appointment.objects.filter(status__in=['Completed', 'Paid']).count(),
+        'completed': Appointment.objects.filter(status=['Completed', 'Paid']).count(),
         'cancelled': Appointment.objects.filter(status='Cancelled').count(),
     }
 
@@ -370,6 +386,7 @@ def employee_dashboard(request):
         'confirmed_appointments': confirmed_appointments,
         'completed_appointments': completed_appointments,
         'appointment_counts': appointment_counts,
+        'services': Service.objects.all(),  # Add this line
     }
     
     return render(request, 'dashboards/employee_dashboard.html', context)
@@ -377,33 +394,34 @@ def employee_dashboard(request):
 @login_required
 @user_passes_test(lambda u: u.user_type in ['ADMIN', 'EMPLOYEE'])
 def add_service(request):
-    """Add new service - accessible by both admin and employees"""
+    """Add a new service"""
     if request.method == 'POST':
         form = ServiceForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Service added successfully!")
-            return redirect('admin_dashboard' if request.user.user_type == 'ADMIN' else 'employee_dashboard')
+            service = form.save()
+            messages.success(request, f"Service '{service.name}' added successfully!")
+            return redirect('manage_services')
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         form = ServiceForm()
-    
     return render(request, 'services/add_service.html', {'form': form})
 
 @login_required
 @user_passes_test(lambda u: u.user_type in ['ADMIN', 'EMPLOYEE'])
 def edit_service(request, service_id):
-    """Edit existing service - accessible by both admin and employees"""
+    """Edit an existing service"""
     service = get_object_or_404(Service, id=service_id)
-    
     if request.method == 'POST':
         form = ServiceForm(request.POST, request.FILES, instance=service)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Service updated successfully!")
-            return redirect('admin_dashboard' if request.user.user_type == 'ADMIN' else 'employee_dashboard')
+            service = form.save()
+            messages.success(request, f"Service '{service.name}' updated successfully!")
+            return redirect('manage_services')
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         form = ServiceForm(instance=service)
-    
     return render(request, 'services/edit_service.html', {'form': form, 'service': service})
 
 @login_required
@@ -715,7 +733,78 @@ def admin_service_management(request):
 @login_required
 @user_passes_test(lambda u: u.user_type == 'ADMIN')
 def admin_reports(request):
-    return render(request, 'admin/reports.html')
+    """Generate reports and analytics for the admin"""
+    today = timezone.now().date()
+    thirty_days_ago = today - timezone.timedelta(days=30)
+    
+    # Get revenue data for the last 30 days
+    daily_revenue = Payment.objects.filter(
+        payment_date__gte=thirty_days_ago
+    ).values('payment_date').annotate(
+        total_revenue=models.Sum('total_amount'),
+        appointment_count=models.Count('id'),
+        average_value=models.Avg('total_amount')
+    ).order_by('payment_date')
+
+    # Convert daily revenue data for JSON serialization
+    revenue_data = []
+    for entry in daily_revenue:
+        revenue_data.append({
+            'payment_date': entry['payment_date'].strftime('%Y-%m-%d'),
+            'total_revenue': float(entry['total_revenue'] if entry['total_revenue'] else 0),
+            'appointment_count': entry['appointment_count'],
+            'average_value': float(entry['average_value'] if entry['average_value'] else 0)
+        })
+
+    # Get appointment statistics
+    appointment_stats = Appointment.objects.filter(
+        date__gte=thirty_days_ago
+    ).values('status').annotate(
+        count=models.Count('id')
+    )
+
+    # Convert appointment stats for JSON serialization
+    appointment_data = []
+    for stat in appointment_stats:
+        appointment_data.append({
+            'status': stat['status'],
+            'count': stat['count']
+        })
+
+    # Get service statistics for main services
+    main_services_stats = Service.objects.filter(
+        service_type='MAIN'
+    ).annotate(
+        appointment_count=models.Count('appointmentservice'),
+        total_revenue=models.Sum('appointmentservice__price'),
+        sub_services_count=models.Count('sub_services'),
+        active_sub_services=models.Count('sub_services', filter=models.Q(sub_services__is_active=True))
+    ).order_by('-appointment_count')
+
+    # Get top performing sub-services
+    top_sub_services = Service.objects.filter(
+        service_type='SUB'
+    ).annotate(
+        booking_count=models.Count('appointmentservice'),
+        total_revenue=models.Sum('appointmentservice__price')
+    ).order_by('-booking_count')[:10]
+
+    # Calculate totals
+    total_revenue = sum(day['total_revenue'] or 0 for day in daily_revenue)
+    total_appointments = sum(stat['count'] for stat in appointment_stats)
+    avg_daily_revenue = total_revenue / len(daily_revenue) if daily_revenue else 0
+
+    context = {
+        'daily_revenue': revenue_data,
+        'appointment_stats': appointment_data,
+        'main_services_stats': main_services_stats,
+        'top_sub_services': top_sub_services,
+        'total_revenue': float(total_revenue),
+        'total_appointments': total_appointments,
+        'average_daily_revenue': float(avg_daily_revenue)
+    }
+    
+    return render(request, 'admin/reports.html', context)
 
 @login_required
 @user_passes_test(lambda u: u.user_type == 'ADMIN')
@@ -741,3 +830,26 @@ def deactivate_user(request, user_id):
         user.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
+@login_required
+def get_sub_services(request, main_service_id):
+    """API endpoint to get sub-services for a main service"""
+    try:
+        main_service = Service.objects.get(id=main_service_id, service_type='MAIN')
+        sub_services = main_service.sub_services.filter(is_active=True)
+        data = [{
+            'id': service.id,
+            'name': service.name,
+            'price': float(service.price),
+            'duration': service.duration
+        } for service in sub_services]
+        return JsonResponse({'sub_services': data})
+    except Service.DoesNotExist:
+        return JsonResponse({'error': 'Main service not found'}, status=404)
+
+@login_required
+@user_passes_test(lambda u: u.user_type in ['ADMIN', 'EMPLOYEE'])
+def manage_services(request):
+    """View to manage services"""
+    services = Service.objects.all().order_by('service_type', 'name')
+    return render(request, 'services/manage_services.html', {'services': services})

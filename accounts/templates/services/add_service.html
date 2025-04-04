@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load widget_tweaks %}
 
 {% block content %}
 <div class="container">
@@ -12,57 +13,103 @@
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            Please correct the errors below.
+                        </div>
+                        {% endif %}
+
+                        <!-- Service Type -->
+                        <div class="mb-3">
+                            <label for="{{ form.service_type.id_for_label }}" class="form-label">Service Type</label>
+                            {{ form.service_type|add_class:"form-control" }}
+                            {% if form.service_type.errors %}
+                            <div class="text-danger">
+                                {{ form.service_type.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Parent Service (for sub-services) -->
+                        <div class="mb-3" id="parent-service-container" style="display: none;">
+                            <label for="{{ form.parent_service.id_for_label }}" class="form-label">Parent Service</label>
+                            {{ form.parent_service|add_class:"form-control" }}
+                            {% if form.parent_service.errors %}
+                            <div class="text-danger">
+                                {{ form.parent_service.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Basic Info -->
                         <div class="mb-3">
                             <label for="{{ form.name.id_for_label }}" class="form-label">Service Name</label>
-                            {{ form.name }}
+                            {{ form.name|add_class:"form-control" }}
                             {% if form.name.errors %}
-                            <div class="text-danger">{{ form.name.errors }}</div>
+                            <div class="text-danger">
+                                {{ form.name.errors }}
+                            </div>
                             {% endif %}
                         </div>
 
                         <div class="mb-3">
                             <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
-                            {{ form.description }}
+                            {{ form.description|add_class:"form-control" }}
                             {% if form.description.errors %}
-                            <div class="text-danger">{{ form.description.errors }}</div>
+                            <div class="text-danger">
+                                {{ form.description.errors }}
+                            </div>
                             {% endif %}
                         </div>
 
-                        <div class="row mb-3">
-                            <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="{{ form.price.id_for_label }}" class="form-label">Price ($)</label>
-                                {{ form.price }}
+                                {{ form.price|add_class:"form-control" }}
                                 {% if form.price.errors %}
-                                <div class="text-danger">{{ form.price.errors }}</div>
+                                <div class="text-danger">
+                                    {{ form.price.errors }}
+                                </div>
                                 {% endif %}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6 mb-3">
                                 <label for="{{ form.duration.id_for_label }}" class="form-label">Duration (minutes)</label>
-                                {{ form.duration }}
+                                {{ form.duration|add_class:"form-control" }}
                                 {% if form.duration.errors %}
-                                <div class="text-danger">{{ form.duration.errors }}</div>
+                                <div class="text-danger">
+                                    {{ form.duration.errors }}
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label for="{{ form.image.id_for_label }}" class="form-label">Service Image</label>
-                            {{ form.image }}
+                            {{ form.image|add_class:"form-control" }}
                             {% if form.image.errors %}
-                            <div class="text-danger">{{ form.image.errors }}</div>
+                            <div class="text-danger">
+                                {{ form.image.errors }}
+                            </div>
                             {% endif %}
                         </div>
 
-                        <div class="mb-3 form-check">
-                            {{ form.is_active }}
-                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                                Active Service
-                            </label>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_active|add_class:"form-check-input" }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    Active Service
+                                </label>
+                            </div>
+                            {% if form.is_active.errors %}
+                            <div class="text-danger">
+                                {{ form.is_active.errors }}
+                            </div>
+                            {% endif %}
                         </div>
 
                         <div class="text-center">
                             <button type="submit" class="btn btn-primary">Add Service</button>
-                            <a href="{% url 'employee_dashboard' %}" class="btn btn-secondary">Cancel</a>
+                            <a href="{% url 'manage_services' %}" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>
@@ -70,4 +117,22 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const serviceTypeSelect = document.getElementById('{{ form.service_type.id_for_label }}');
+    const parentServiceContainer = document.getElementById('parent-service-container');
+
+    function toggleParentService() {
+        if (serviceTypeSelect.value === 'SUB') {
+            parentServiceContainer.style.display = 'block';
+        } else {
+            parentServiceContainer.style.display = 'none';
+        }
+    }
+
+    serviceTypeSelect.addEventListener('change', toggleParentService);
+    toggleParentService(); // Initial state
+});
+</script>
 {% endblock %} 

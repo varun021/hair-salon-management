@@ -3,203 +3,133 @@
 {% block content %}
 <div class="container">
     <div class="row mb-4">
-        <div class="col-md-8">
-            <h2>Service Management</h2>
+        <div class="col">
+            <h2>Manage Services</h2>
         </div>
-        <div class="col-md-4 text-end">
-            <a href="{% url 'add_service' %}" class="btn btn-primary">Add New Service</a>
+        <div class="col text-end">
+            <a href="{% url 'add_service' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add New Service
+            </a>
         </div>
     </div>
 
-    <!-- Service Categories -->
-    <div class="row mb-4">
-        {% for category in categories %}
-        <div class="col-md-12 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">{{ category.name }}</h5>
-                    <button class="btn btn-sm btn-outline-primary edit-category" 
-                            data-category-id="{{ category.id }}">
-                        Edit Category
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Service Name</th>
-                                    <th>Duration</th>
-                                    <th>Price</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for service in category.service_set.all %}
-                                <tr>
-                                    <td>{{ service.name }}</td>
-                                    <td>{{ service.duration }} mins</td>
-                                    <td>${{ service.price }}</td>
-                                    <td>
-                                        <span class="badge {% if service.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                            {{ service.is_active|yesno:"Active,Inactive" }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-warning edit-service" 
-                                                data-service-id="{{ service.id }}">
-                                            Edit
-                                        </button>
-                                        <button class="btn btn-sm btn-danger delete-service" 
-                                                data-service-id="{{ service.id }}">
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center">No services in this category</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
         </div>
         {% endfor %}
     </div>
-</div>
+    {% endif %}
 
-<!-- Edit Service Modal -->
-<div class="modal fade" id="editServiceModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Service</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- Main Services -->
+    {% for main_service in services %}
+    {% if main_service.is_main_service %}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ main_service.name }}</h5>
+            <div>
+                <a href="{% url 'edit_service' main_service.id %}" class="btn btn-light btn-sm">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <button class="btn btn-light btn-sm" onclick="toggleSubServices('{{ main_service.id }}')">
+                    <i class="fas fa-chevron-down" id="toggle-icon-{{ main_service.id }}"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <form id="editServiceForm">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Service Name</label>
-                        <input type="text" class="form-control" name="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Duration (minutes)</label>
-                        <input type="number" class="form-control" name="duration" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Price ($)</label>
-                        <input type="number" class="form-control" name="price" step="0.01" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select class="form-control" name="category" required>
-                            {% for category in categories %}
-                            <option value="{{ category.id }}">{{ category.name }}</option>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <p class="mb-1"><strong>Description:</strong> {{ main_service.description|default:"No description available" }}</p>
+                    <p class="mb-1"><strong>Base Price:</strong> ${{ main_service.price }}</p>
+                    <p class="mb-0"><strong>Duration:</strong> {{ main_service.duration }} minutes</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    {% if main_service.image %}
+                    <img src="{{ main_service.image.url }}" alt="{{ main_service.name }}" class="img-thumbnail" style="max-height: 100px;">
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sub-services -->
+            <div id="sub-services-{{ main_service.id }}" class="sub-services" style="display: none;">
+                <h6 class="mt-3 mb-3">Sub-services</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub_service in main_service.sub_services.all %}
+                            <tr>
+                                <td>{{ sub_service.name }}</td>
+                                <td>${{ sub_service.price }}</td>
+                                <td>{{ sub_service.duration }} min</td>
+                                <td>
+                                    <span class="badge {% if sub_service.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                        {% if sub_service.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'edit_service' sub_service.id %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">No sub-services available</td>
+                            </tr>
                             {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input type="checkbox" class="form-check-input" name="is_active" id="serviceActive">
-                        <label class="form-check-label" for="serviceActive">Active</label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="saveServiceBtn">Save Changes</button>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
+    {% endif %}
+    {% empty %}
+    <div class="alert alert-info">
+        No services available. Click "Add New Service" to create one.
+    </div>
+    {% endfor %}
 </div>
 
-{% block extra_js %}
+<style>
+.sub-services {
+    margin-top: 1rem;
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+.card-header .btn-light {
+    margin-left: 0.5rem;
+}
+.badge {
+    font-size: 0.875rem;
+}
+</style>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Edit Service
-    const editButtons = document.querySelectorAll('.edit-service');
-    editButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const serviceId = this.dataset.serviceId;
-            fetch(`/services/${serviceId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    const form = document.getElementById('editServiceForm');
-                    form.querySelector('[name="name"]').value = data.name;
-                    form.querySelector('[name="duration"]').value = data.duration;
-                    form.querySelector('[name="price"]').value = data.price;
-                    form.querySelector('[name="category"]').value = data.category;
-                    form.querySelector('[name="is_active"]').checked = data.is_active;
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('editServiceModal'));
-                    modal.show();
-                    
-                    // Save button handler
-                    document.getElementById('saveServiceBtn').onclick = function() {
-                        const formData = new FormData(form);
-                        fetch(`/services/${serviceId}/update/`, {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken')
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                location.reload();
-                            } else {
-                                alert('Error updating service');
-                            }
-                        });
-                    };
-                });
-        });
-    });
-
-    // Delete Service
-    const deleteButtons = document.querySelectorAll('.delete-service');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            if (confirm('Are you sure you want to delete this service?')) {
-                const serviceId = this.dataset.serviceId;
-                fetch(`/services/${serviceId}/delete/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken')
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error deleting service');
-                    }
-                });
-            }
-        });
-    });
-
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
+function toggleSubServices(serviceId) {
+    const subServicesDiv = document.getElementById(`sub-services-${serviceId}`);
+    const toggleIcon = document.getElementById(`toggle-icon-${serviceId}`);
+    
+    if (subServicesDiv.style.display === 'none') {
+        subServicesDiv.style.display = 'block';
+        toggleIcon.classList.remove('fa-chevron-down');
+        toggleIcon.classList.add('fa-chevron-up');
+    } else {
+        subServicesDiv.style.display = 'none';
+        toggleIcon.classList.remove('fa-chevron-up');
+        toggleIcon.classList.add('fa-chevron-down');
     }
-});
+}
 </script>
-{% endblock %}
 {% endblock %} 

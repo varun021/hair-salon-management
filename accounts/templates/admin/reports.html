@@ -1,45 +1,78 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load json_filters %}
 
 {% block content %}
 <div class="container-fluid py-4">
     <h3 class="mb-4">Reports & Analytics</h3>
 
-    <!-- Revenue Overview -->
+    <!-- Summary Cards -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Revenue Overview</h5>
-                </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
                 <div class="card-body">
-                    <canvas id="revenueChart"></canvas>
+                    <h5 class="card-title">Total Revenue (30 Days)</h5>
+                    <h2 class="mb-0">${{ total_revenue|floatformat:2 }}</h2>
+                    <small>Avg. Daily: ${{ average_daily_revenue|floatformat:2 }}</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Appointment Statistics</h5>
-                </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
                 <div class="card-body">
-                    <canvas id="appointmentChart"></canvas>
+                    <h5 class="card-title">Total Appointments</h5>
+                    <h2 class="mb-0">{{ total_appointments }}</h2>
+                    <small>Last 30 Days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Average Appointment Value</h5>
+                    <h2 class="mb-0">${{ average_daily_revenue|floatformat:2 }}</h2>
+                    <small>Per Appointment</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Detailed Reports -->
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Revenue Trend (Last 30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" style="min-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Appointment Status</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="appointmentChart" style="min-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Analytics -->
     <div class="row">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Detailed Reports</h5>
+                        <h5 class="mb-0">Service Analytics</h5>
                         <div class="btn-group">
-                            <button class="btn btn-outline-primary">
+                            <button class="btn btn-outline-primary" onclick="exportToCSV()">
                                 <i class="fas fa-download me-2"></i>Export
                             </button>
-                            <button class="btn btn-outline-secondary">
+                            <button class="btn btn-outline-secondary" onclick="window.print()">
                                 <i class="fas fa-print me-2"></i>Print
                             </button>
                         </div>
@@ -48,40 +81,80 @@
                 <div class="card-body">
                     <ul class="nav nav-tabs mb-4">
                         <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#revenue">Revenue</a>
+                            <a class="nav-link active" data-bs-toggle="tab" href="#main-services">Main Services</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#appointments">Appointments</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#services">Services</a>
+                            <a class="nav-link" data-bs-toggle="tab" href="#sub-services">Top Sub-Services</a>
                         </li>
                     </ul>
 
                     <div class="tab-content">
-                        <div class="tab-pane fade show active" id="revenue">
-                            <!-- Revenue Table -->
+                        <!-- Main Services Tab -->
+                        <div class="tab-pane fade show active" id="main-services">
                             <div class="table-responsive">
                                 <table class="table">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
+                                            <th>Service Name</th>
+                                            <th>Total Bookings</th>
                                             <th>Revenue</th>
-                                            <th>Appointments</th>
-                                            <th>Average Value</th>
+                                            <th>Sub-Services</th>
+                                            <th>Active Sub-Services</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Add your revenue data here -->
+                                        {% for service in main_services_stats %}
+                                        <tr>
+                                            <td>{{ service.name }}</td>
+                                            <td>{{ service.appointment_count }}</td>
+                                            <td>${{ service.total_revenue|default:0|floatformat:2 }}</td>
+                                            <td>{{ service.sub_services_count }}</td>
+                                            <td>{{ service.active_sub_services }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center">No main services found</td>
+                                        </tr>
+                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                        <div class="tab-pane fade" id="appointments">
-                            <!-- Appointments Table -->
-                        </div>
-                        <div class="tab-pane fade" id="services">
-                            <!-- Services Table -->
+
+                        <!-- Sub-Services Tab -->
+                        <div class="tab-pane fade" id="sub-services">
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sub-Service Name</th>
+                                            <th>Parent Service</th>
+                                            <th>Bookings</th>
+                                            <th>Revenue</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for service in top_sub_services %}
+                                        <tr>
+                                            <td>{{ service.name }}</td>
+                                            <td>{{ service.parent_service.name }}</td>
+                                            <td>{{ service.booking_count }}</td>
+                                            <td>${{ service.total_revenue|default:0|floatformat:2 }}</td>
+                                            <td>
+                                                <span class="badge {% if service.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {% if service.is_active %}Active{% else %}Inactive{% endif %}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center">No sub-services found</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -92,31 +165,173 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Sample charts - replace with real data
-const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-new Chart(revenueCtx, {
-    type: 'line',
-    data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-            label: 'Monthly Revenue',
-            data: [1200, 1900, 1500, 2100, 1800, 2300],
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1
-        }]
+document.addEventListener('DOMContentLoaded', function() {
+    // Get the canvas elements
+    const revenueCanvas = document.getElementById('revenueChart');
+    const appointmentCanvas = document.getElementById('appointmentChart');
+
+    // Get the data from the template
+    const revenueData = {{ daily_revenue|json|safe }};
+    const appointmentData = {{ appointment_stats|json|safe }};
+
+    // Set default dimensions
+    revenueCanvas.style.height = '300px';
+    appointmentCanvas.style.height = '300px';
+
+    // Initialize Revenue Chart
+    if (revenueData && revenueData.length > 0) {
+        new Chart(revenueCanvas, {
+            type: 'line',
+            data: {
+                labels: revenueData.map(item => {
+                    const date = new Date(item.payment_date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }),
+                datasets: [{
+                    label: 'Daily Revenue',
+                    data: revenueData.map(item => item.total_revenue),
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Revenue: $${context.parsed.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        const ctx = revenueCanvas.getContext('2d');
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No revenue data available', revenueCanvas.width / 2, revenueCanvas.height / 2);
+    }
+
+    // Initialize Appointment Chart
+    if (appointmentData && appointmentData.length > 0) {
+        new Chart(appointmentCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: appointmentData.map(item => item.status),
+                datasets: [{
+                    data: appointmentData.map(item => item.count),
+                    backgroundColor: [
+                        '#28a745', // Completed
+                        '#ffc107', // Pending
+                        '#17a2b8', // Confirmed
+                        '#dc3545'  // Cancelled
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                return `${label}: ${value} appointments`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        const ctx = appointmentCanvas.getContext('2d');
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No appointment data available', appointmentCanvas.width / 2, appointmentCanvas.height / 2);
     }
 });
 
-const appointmentCtx = document.getElementById('appointmentChart').getContext('2d');
-new Chart(appointmentCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Completed', 'Pending', 'Cancelled'],
-        datasets: [{
-            data: [65, 25, 10],
-            backgroundColor: ['#28a745', '#ffc107', '#dc3545']
-        }]
+function exportToCSV() {
+    const mainServicesData = Array.from(document.querySelectorAll('#main-services table tbody tr')).map(row => {
+        const cells = Array.from(row.cells);
+        return {
+            'Service Name': cells[0].textContent,
+            'Total Bookings': cells[1].textContent,
+            'Revenue': cells[2].textContent,
+            'Sub-Services': cells[3].textContent,
+            'Active Sub-Services': cells[4].textContent
+        };
+    });
+
+    if (mainServicesData.length === 0) {
+        alert('No data available to export');
+        return;
     }
-});
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + "Service Name,Total Bookings,Revenue,Sub-Services,Active Sub-Services\n"
+        + mainServicesData.map(row => 
+            Object.values(row).join(',')
+        ).join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'service_analytics.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 </script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+}
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom: 2px solid #0d6efd;
+}
+.table th {
+    border-top: none;
+    background-color: #f8f9fa;
+}
+.badge {
+    padding: 0.5em 0.8em;
+}
+</style>
 {% endblock %} 
